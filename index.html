@@ -1,0 +1,2563 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Claude SFC">
+<meta name="theme-color" content="#22252d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}*{-webkit-tap-highlight-color:transparent}</style>
+<title>Claude SFC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+1p:wght@400;700&display=swap">
+<style>
+/* Layout: a putty-colored 16-bit "deck" sitting on a dark desk — CRT bay on top (left on wide screens), pad panel below (right). Everything has stepped pixel corners. */
+:root{
+  --desk:#22252d; --desk-dot:#2a2e38;
+  --putty:#dcd5c4; --putty-hi:#eee9dc; --putty-lo:#b8b09c; --putty-ink:#3a3832;
+  --slate:#3d424f; --slate-lo:#2b2f39; --slate-hi:#545a69;
+  --coral:#e0573a; --coral-lo:#a93c25; --teal:#41c9b0; --cream:#f5f0e4; --dim:#8c8676;
+  --f-pix:"DotGothic16","Hiragino Kaku Gothic ProN",monospace;
+  --f-lat:"DotGothic16",monospace;
+  --f-body:"M PLUS 1p","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --px:4px;
+  color-scheme:dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{margin:0;color:var(--cream);font-family:var(--f-body);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;
+  background-color:var(--desk);
+  background-image:radial-gradient(var(--desk-dot) 1px,transparent 1.5px);background-size:8px 8px}
+/* stepped pixel corners */
+.px2{clip-path:polygon(0px 8px,2px 8px,2px 4px,4px 4px,4px 2px,8px 2px,8px 0px,calc(100% - 8px) 0px,calc(100% - 8px) 2px,calc(100% - 4px) 2px,calc(100% - 4px) 4px,calc(100% - 2px) 4px,calc(100% - 2px) 8px,calc(100% - 0px) 8px,calc(100% - 0px) calc(100% - 8px),calc(100% - 2px) calc(100% - 8px),calc(100% - 2px) calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) calc(100% - 2px),calc(100% - 8px) calc(100% - 2px),calc(100% - 8px) calc(100% - 0px),8px calc(100% - 0px),8px calc(100% - 2px),4px calc(100% - 2px),4px calc(100% - 4px),2px calc(100% - 4px),2px calc(100% - 8px),0px calc(100% - 8px))}
+.px1{clip-path:polygon(0px 4px,1px 4px,1px 2px,2px 2px,2px 1px,4px 1px,4px 0px,calc(100% - 4px) 0px,calc(100% - 4px) 1px,calc(100% - 2px) 1px,calc(100% - 2px) 2px,calc(100% - 1px) 2px,calc(100% - 1px) 4px,calc(100% - 0px) 4px,calc(100% - 0px) calc(100% - 4px),calc(100% - 1px) calc(100% - 4px),calc(100% - 1px) calc(100% - 2px),calc(100% - 2px) calc(100% - 2px),calc(100% - 2px) calc(100% - 1px),calc(100% - 4px) calc(100% - 1px),calc(100% - 4px) calc(100% - 0px),4px calc(100% - 0px),4px calc(100% - 1px),2px calc(100% - 1px),2px calc(100% - 2px),1px calc(100% - 2px),1px calc(100% - 4px),0px calc(100% - 4px))}
+.pxo{clip-path:polygon(63.64% 0.00%,63.64% 4.55%,77.27% 4.55%,77.27% 9.09%,81.82% 9.09%,81.82% 13.64%,86.36% 13.64%,86.36% 18.18%,90.91% 18.18%,90.91% 22.73%,95.45% 22.73%,95.45% 27.27%,95.45% 31.82%,95.45% 36.36%,100.00% 36.36%,100.00% 40.91%,100.00% 45.45%,100.00% 50.00%,100.00% 54.55%,100.00% 59.09%,100.00% 63.64%,95.45% 63.64%,95.45% 68.18%,95.45% 72.73%,95.45% 77.27%,90.91% 77.27%,90.91% 81.82%,86.36% 81.82%,86.36% 86.36%,81.82% 86.36%,81.82% 90.91%,77.27% 90.91%,77.27% 95.45%,63.64% 95.45%,63.64% 100.00%,36.36% 100.00%,36.36% 95.45%,22.73% 95.45%,22.73% 90.91%,18.18% 90.91%,18.18% 86.36%,13.64% 86.36%,13.64% 81.82%,9.09% 81.82%,9.09% 77.27%,4.55% 77.27%,4.55% 72.73%,4.55% 68.18%,4.55% 63.64%,0.00% 63.64%,0.00% 59.09%,0.00% 54.55%,0.00% 50.00%,0.00% 45.45%,0.00% 40.91%,0.00% 36.36%,4.55% 36.36%,4.55% 31.82%,4.55% 27.27%,4.55% 22.73%,9.09% 22.73%,9.09% 18.18%,13.64% 18.18%,13.64% 13.64%,18.18% 13.64%,18.18% 9.09%,22.73% 9.09%,22.73% 4.55%,36.36% 4.55%,36.36% 0.00%)}
+.well.pxo{clip-path:polygon(62.50% 0.00%,62.50% 3.12%,71.88% 3.12%,71.88% 6.25%,78.12% 6.25%,78.12% 9.38%,81.25% 9.38%,81.25% 12.50%,84.38% 12.50%,84.38% 15.62%,87.50% 15.62%,87.50% 18.75%,90.62% 18.75%,90.62% 21.88%,93.75% 21.88%,93.75% 25.00%,93.75% 28.12%,96.88% 28.12%,96.88% 31.25%,96.88% 34.38%,96.88% 37.50%,100.00% 37.50%,100.00% 40.62%,100.00% 43.75%,100.00% 46.88%,100.00% 50.00%,100.00% 53.12%,100.00% 56.25%,100.00% 59.38%,100.00% 62.50%,96.88% 62.50%,96.88% 65.62%,96.88% 68.75%,96.88% 71.88%,93.75% 71.88%,93.75% 75.00%,93.75% 78.12%,90.62% 78.12%,90.62% 81.25%,87.50% 81.25%,87.50% 84.38%,84.38% 84.38%,84.38% 87.50%,81.25% 87.50%,81.25% 90.62%,78.12% 90.62%,78.12% 93.75%,71.88% 93.75%,71.88% 96.88%,62.50% 96.88%,62.50% 100.00%,37.50% 100.00%,37.50% 96.88%,28.12% 96.88%,28.12% 93.75%,21.88% 93.75%,21.88% 90.62%,18.75% 90.62%,18.75% 87.50%,15.62% 87.50%,15.62% 84.38%,12.50% 84.38%,12.50% 81.25%,9.38% 81.25%,9.38% 78.12%,6.25% 78.12%,6.25% 75.00%,6.25% 71.88%,3.12% 71.88%,3.12% 68.75%,3.12% 65.62%,3.12% 62.50%,0.00% 62.50%,0.00% 59.38%,0.00% 56.25%,0.00% 53.12%,0.00% 50.00%,0.00% 46.88%,0.00% 43.75%,0.00% 40.62%,0.00% 37.50%,3.12% 37.50%,3.12% 34.38%,3.12% 31.25%,3.12% 28.12%,6.25% 28.12%,6.25% 25.00%,6.25% 21.88%,9.38% 21.88%,9.38% 18.75%,12.50% 18.75%,12.50% 15.62%,15.62% 15.62%,15.62% 12.50%,18.75% 12.50%,18.75% 9.38%,21.88% 9.38%,21.88% 6.25%,28.12% 6.25%,28.12% 3.12%,37.50% 3.12%,37.50% 0.00%)}
+
+.app{min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;max-width:1000px;margin:0 auto;
+  padding-block:14px 22px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;gap:2px;line-height:1}
+.logo{font-family:var(--f-pix);font-size:26px;letter-spacing:.04em;line-height:1;
+  background:linear-gradient(180deg,#ffffff 0 40%,#e9e3d3 40% 55%,#cfc6b0 55% 70%,#a99f88 70%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(1px 0 0 #14161c) drop-shadow(-1px 0 0 #14161c) drop-shadow(0 1px 0 #14161c) drop-shadow(0 -1px 0 #14161c) drop-shadow(2px 2px 0 #000)}
+.logo em{font-style:normal;margin-left:.25em;background:linear-gradient(180deg,#ffd1c2 0 35%,#f07a5a 35% 55%,#e0573a 55% 75%,#b8432b 75%);-webkit-background-clip:text;background-clip:text}
+.tag{font-family:var(--f-pix);font-size:10px;letter-spacing:.16em;color:var(--dim);margin-top:3px}
+.title{font-family:var(--f-pix);color:var(--putty-lo);font-size:13px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+.tb{font:13px var(--f-pix);color:var(--putty-ink);background:linear-gradient(180deg,var(--putty-hi) 0 2px,var(--putty) 2px calc(100% - 3px),var(--putty-lo) calc(100% - 3px));border:0;padding:8px 12px 9px;cursor:pointer;box-shadow:none}
+.tb:active,.tb[aria-pressed="true"]{background:linear-gradient(180deg,var(--putty-lo) 0 2px,var(--putty) 2px calc(100% - 1px),var(--putty) calc(100% - 1px));padding:9px 12px 8px}
+.tb[aria-pressed="true"]{background:linear-gradient(180deg,#2a9483 0 2px,var(--teal) 2px calc(100% - 2px),#7fe0c9 calc(100% - 2px));color:#0d2b26}
+.tb.primary{background:linear-gradient(180deg,#f39a80 0 2px,var(--coral) 2px calc(100% - 3px),var(--coral-lo) calc(100% - 3px));color:var(--cream);text-shadow:1px 1px 0 var(--coral-lo)}
+.tb:disabled{opacity:.45;cursor:default}
+.tb:focus-visible,.key:focus-visible,.shoulder:focus-visible,.pill:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+.main{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+@media (min-width:860px) and (min-height:560px){.main{grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr)}}
+
+/* CRT bay */
+.bay{background:linear-gradient(180deg,var(--putty-hi) 0 4px,var(--putty) 4px calc(100% - 6px),var(--putty-lo) calc(100% - 6px));padding:14px;box-shadow:inset 2px 0 0 var(--putty-hi),inset -2px 0 0 var(--putty-lo)}
+.bay-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 10px;font-family:var(--f-lat);font-size:10px;letter-spacing:.14em;color:var(--putty-ink)}
+.led{display:inline-flex;align-items:center;gap:6px}
+.led i{width:8px;height:8px;background:#5a564c;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)}
+body.on .led i{background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.bezel{background:var(--slate-lo);padding:10px;--px:4px}
+.screen{position:relative;width:100%;aspect-ratio:8/7;max-width:100%;background:#000;overflow:hidden}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+body.scan .screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px)}
+.idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;text-align:center;padding:12px 12px 5%}
+.win{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 16px;width:min(92%,420px);box-sizing:border-box;background:linear-gradient(180deg,#3b4fae 0%,#2a3a8c 40%,#1b2662 100%);box-shadow:inset 0 0 0 2px #10142c,inset 0 0 0 4px #e9e7f2,inset 0 0 0 6px #8d91ad}
+.idle canvas{position:absolute;inset:0;z-index:0}
+.idle>*:not(canvas){position:relative;z-index:1}
+.idle h1{font-family:var(--f-pix);font-weight:400;font-size:clamp(16px,4vw,24px);margin:0;color:var(--cream);text-shadow:2px 2px 0 #000;text-wrap:balance}
+.idle p{margin:0;color:#d9d6e8;font-size:12px;line-height:1.7;max-width:32ch;text-shadow:1px 1px 0 #000}
+.blink{animation:blink 1.1s steps(2,end) infinite}
+@keyframes blink{50%{opacity:.25}}
+.lcd{margin-top:10px;background:linear-gradient(180deg,#3b4fae 0%,#2a3a8c 40%,#1b2662 100%);box-shadow:inset 0 0 0 2px #10142c,inset 0 0 0 4px #e9e7f2,inset 0 0 0 6px #8d91ad;color:#f5f0e4;text-shadow:1px 1px 0 #10142c;font:12px var(--f-pix);padding:9px 12px;display:flex;justify-content:space-between;gap:8px;
+  min-height:1.4em;font-variant-numeric:tabular-nums}
+.lcd span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* pad panel */
+.deck{background:linear-gradient(180deg,var(--putty-hi) 0 4px,var(--putty) 4px calc(100% - 6px),var(--putty-lo) calc(100% - 6px));padding:16px 14px 14px;--px:6px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-rows:auto 1fr auto;gap:12px 8px;touch-action:none;
+  box-shadow:inset 2px 0 0 var(--putty-hi),inset -2px 0 0 var(--putty-lo)}
+.shoulder{grid-row:1;height:34px;border:0;background:linear-gradient(180deg,var(--slate-hi) 0 2px,var(--slate) 2px calc(100% - 4px),var(--slate-lo) calc(100% - 4px));color:var(--putty);font:15px var(--f-pix);touch-action:none;text-shadow:1px 1px 0 var(--slate-lo)}
+.shoulder.l{grid-column:1}.shoulder.r{grid-column:3}
+.well{width:140px;height:140px;justify-self:center;align-self:center;background:radial-gradient(circle at 50% 45%,#c9c1ad 0 58%,var(--putty-lo) 58% 80%,#a59c87 80%);position:relative;display:flex;align-items:center;justify-content:center}
+.dpad{position:relative;width:128px;height:128px;touch-action:none}
+.dpad .cross{position:absolute;inset:0;background:linear-gradient(180deg,var(--slate-hi) 0 4%,var(--slate) 4% 92%,var(--slate-lo) 92%);
+  clip-path:polygon(34% 0,66% 0,66% 34%,100% 34%,100% 66%,66% 66%,66% 100%,34% 100%,34% 66%,0 66%,0 34%,34% 34%)}
+.dpad .ar{position:absolute;width:34%;height:34%;display:flex;align-items:center;justify-content:center;color:var(--slate-hi);font:11px var(--f-pix)}
+.dpad .up{left:33%;top:0}.dpad .dn{left:33%;bottom:0}.dpad .lf{left:0;top:33%}.dpad .rt{right:0;top:33%}
+.dpad .hub{position:absolute;left:42%;top:42%;width:16%;height:16%;background:var(--slate-lo)}
+.dpad.u .up,.dpad.d .dn,.dpad.l .lf,.dpad.r .rt{color:var(--teal)}
+.mid{grid-row:2;grid-column:2;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.mid div{display:flex;flex-direction:column;align-items:center;gap:4px}
+.pill{border:0;width:58px;height:16px;background:linear-gradient(180deg,var(--slate-hi) 0 2px,var(--slate) 2px calc(100% - 3px),var(--slate-lo) calc(100% - 3px));touch-action:none}
+.mid small{font:9px var(--f-lat);letter-spacing:.12em;color:var(--putty-ink)}
+.dwell{grid-column:1;grid-row:2}
+.fwell{grid-column:3;grid-row:2}
+.face{position:relative;width:132px;height:132px}
+.key{position:absolute;width:46px;height:46px;border:0;font:700 14px var(--f-lat);touch-action:none}
+.key.x{left:43px;top:0}.key.y{left:0;top:43px}.key.a{right:0;top:43px}.key.b{left:43px;bottom:0}
+.key.a,.key.b{background:radial-gradient(circle at 38% 32%,#ffc2ae 0 10%,#f3866a 10% 30%,var(--coral) 30% 62%,var(--coral-lo) 62%);color:var(--cream);text-shadow:1px 1px 0 var(--coral-lo)}
+.key.x,.key.y{background:radial-gradient(circle at 38% 32%,#8a91a3 0 10%,var(--slate-hi) 10% 30%,var(--slate) 30% 62%,var(--slate-lo) 62%);color:var(--putty);text-shadow:1px 1px 0 var(--slate-lo)}
+.face .lbl{position:absolute;font:9px var(--f-lat);color:var(--putty-ink)}
+.on{transform:translateY(2px);filter:brightness(1.15)}
+.key.on{filter:brightness(.88)}
+.help{grid-row:3;grid-column:1/-1;font-size:11px;color:var(--putty-ink);line-height:1.8;text-align:center}
+.help kbd{font:11px var(--f-lat);background:var(--putty-hi);padding:0 5px;color:var(--putty-ink);box-shadow:inset 0 -2px 0 var(--putty-lo)}
+@media (hover:none){.help .kb{display:none}}
+@media (max-width:440px){.well{width:116px;height:116px}.well>*{transform:scale(.82);flex:none}.deck{padding-left:10px;padding-right:10px;gap:12px 4px}}
+@media (max-width:350px){.well{width:100px;height:100px}.well>*{transform:scale(.7)}}
+@media (prefers-reduced-motion:reduce){.blink{animation:none}.on{transform:none}}
+
+/* immersive (landscape / fullscreen) */
+.exit{display:none}
+body.imm{overflow:hidden;background:#000}
+body.imm .app{position:fixed;inset:0;max-width:none;margin:0;padding:0;display:block;background:#000;z-index:5}
+body.imm header,body.imm .lcd,body.imm .help,body.imm .bay-top{display:none}
+body.imm .exit{display:block;position:absolute;z-index:3;top:calc(8px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));opacity:.6}
+body.imm .main{display:block;height:100%}
+body.imm .main>div:first-child{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+body.imm .bay,body.imm .bezel{padding:0;background:none;box-shadow:none;clip-path:none}
+body.imm .screen{width:min(100vw,calc(100vh * 8 / 7));width:min(100vw,calc(100dvh * 8 / 7))}
+body.imm .deck{position:absolute;inset:0;background:none;padding:0;display:block;pointer-events:none;box-shadow:none;clip-path:none}
+body.imm .deck>*{position:absolute;pointer-events:auto;opacity:.6}
+body.imm .well{background:none}
+body.imm .shoulder{top:calc(10px + env(safe-area-inset-top,0px));width:110px}
+body.imm .shoulder.l{left:calc(14px + env(safe-area-inset-left,0px))}
+body.imm .shoulder.r{right:calc(14px + env(safe-area-inset-right,0px))}
+body.imm .dwell{left:calc(10px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+body.imm .fwell{right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+body.imm .mid{left:50%;transform:translateX(-50%);bottom:calc(4px + env(safe-area-inset-bottom,0px));flex-direction:row;gap:22px}
+body.imm .mid small{color:var(--putty)}
+body.imm.gp .deck{display:none}
+.padhint{display:none}
+.immbar{display:none}
+body.imm.on .immbar{display:flex;gap:6px;position:absolute;z-index:3;top:calc(8px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));opacity:.6}
+.toast{position:fixed;z-index:20;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);padding:9px 14px;font:13px var(--f-pix);color:#f5f0e4;white-space:nowrap;pointer-events:none;
+  background:linear-gradient(180deg,#3b4fae 0%,#2a3a8c 40%,#1b2662 100%);box-shadow:inset 0 0 0 2px #10142c,inset 0 0 0 4px #e9e7f2,inset 0 0 0 6px #8d91ad;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
+body.imm.land .deck{display:none}
+body.imm.land:not(.gp) .padhint{display:block;position:absolute;z-index:3;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  background:rgba(0,0,0,.7);color:var(--cream);font:12px var(--f-pix);padding:6px 14px;white-space:nowrap;pointer-events:none}
+body.imm:not(.land) .main>div:first-child{align-items:flex-start;padding-top:calc(52px + env(safe-area-inset-top,0px))}
+body.imm:not(.land) .screen{width:100vw}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand"><div class="logo">CLAUDE<em>SFC</em></div><div class="tag">16-BIT ENTERTAINMENT DECK</div></div>
+    <div class="title" id="title">ROM未ロード</div>
+    <div class="tools">
+      <button class="tb px1 primary" id="load">ROMを開く</button>
+      <button class="tb px1" id="pause" aria-pressed="false" disabled>一時停止</button>
+      <button class="tb px1" id="ff" aria-pressed="false" disabled>早送り</button>
+      <button class="tb px1" id="mute" aria-pressed="false">消音</button>
+      <button class="tb px1" id="scan" aria-pressed="false">走査線</button>
+      <button class="tb px1" id="slot" disabled>スロット1</button>
+      <button class="tb px1" id="ssave" disabled>セーブ</button>
+      <button class="tb px1" id="sload" disabled>ロード</button>
+      <button class="tb px1" id="reset" disabled>リセット</button>
+      <button class="tb px1" id="full" aria-pressed="false">全画面</button>
+    </div>
+    <input type="file" id="file" hidden>
+  </header>
+
+  <button class="tb px1 exit" id="exitFull" aria-label="全画面を終了">✕</button>
+  <div class="immbar"><button class="tb px1" id="issave">SAVE</button><button class="tb px1" id="isload">LOAD</button></div>
+  <div class="toast" id="toast"></div>
+  <div class="padhint">コントローラをつないで、ボタンを1回押してください</div>
+  <div class="main">
+    <div>
+      <div class="bay px2">
+        <div class="bay-top"><span class="led"><i></i>POWER</span><span>VIDEO 256×224</span></div>
+        <div class="bezel px2">
+          <div class="screen">
+            <canvas id="cv" width="256" height="224"></canvas>
+            <div class="idle" id="idle">
+              <canvas id="idlecv" width="256" height="224"></canvas>
+              <div class="win px1"><h1>カセットをセットしてください</h1>
+              <p>手持ちのROM（.sfc / .smc / .zip / .7z）を開くと起動します。ファイルは端末内だけで読み込まれ、どこにも送信されません。</p>
+              <button class="tb px1 primary blink-wrap" id="load2"><span class="blink">▶</span> ROMを開く</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="lcd px1"><span id="stat">待機中</span><span id="fps"></span></div>
+      </div>
+    </div>
+
+    <div class="deck px2" id="deck">
+      <button class="shoulder px1 l" data-k="L">L</button>
+      <button class="shoulder px1 r" data-k="R">R</button>
+      <div class="well pxo dwell">
+        <div class="dpad" id="dpad">
+          <span class="cross"></span><span class="hub"></span>
+          <span class="ar up">▲</span><span class="ar dn">▼</span><span class="ar lf">◀</span><span class="ar rt">▶</span>
+        </div>
+      </div>
+      <div class="mid">
+        <div><button class="pill px1" data-k="SEL" aria-label="SELECT"></button><small>SELECT</small></div>
+        <div><button class="pill px1" data-k="START" aria-label="START"></button><small>START</small></div>
+      </div>
+      <div class="well pxo fwell">
+        <div class="face">
+          <button class="key pxo x" data-k="X">X</button><button class="key pxo y" data-k="Y">Y</button>
+          <button class="key pxo a" data-k="A">A</button><button class="key pxo b" data-k="B">B</button>
+        </div>
+      </div>
+      <div class="help"><span class="kb">キーボード：<kbd>↑↓←→</kbd> 移動 <kbd>X</kbd>A <kbd>Z</kbd>B <kbd>S</kbd>X <kbd>A</kbd>Y <kbd>Q</kbd>L <kbd>W</kbd>R <kbd>Enter</kbd>START <kbd>Shift</kbd>SELECT <kbd>F2</kbd>セーブ <kbd>F4</kbd>ロード<br></span>
+        PS4・PS5・Xboxなどのコントローラも使えます（つないだら一度ボタンを押してください）<br>どこでもセーブ：L3（左スティック押し込み）でセーブ、R3でロード<br>バッテリーバックアップのセーブはこのブラウザに自動保存されます</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ===== 65C816 CPU =====
+const ALU_LOW = new Uint8Array(32);
+[0x01, 0x03, 0x05, 0x07, 0x09, 0x0D, 0x0F, 0x11, 0x12, 0x13, 0x15, 0x17, 0x19, 0x1D, 0x1F].forEach(x => ALU_LOW[x] = 1);
+class CPU {
+  constructor(sys) { this.sys = sys; }
+  reset() {
+    this.A = 0; this.X = 0; this.Y = 0; this.S = 0x1FF; this.D = 0; this.DB = 0; this.PB = 0;
+    this.P = 0x34; this.E = 1; this.waiting = false; this.stopped = false;
+    this.nmiPending = false; this.irqLine = false;
+    this.PC = this.rd(0xFFFC) | (this.rd(0xFFFD) << 8);
+  }
+  rd(a) { return this.sys.read(a); }
+  wr(a, v) { this.sys.write(a, v); }
+  idle(n) { this.sys.cyc += 6 * (n || 1); }
+  f8() { const v = this.rd((this.PB << 16) | this.PC); this.PC = (this.PC + 1) & 0xFFFF; return v; }
+  f16() { const l = this.f8(); return l | (this.f8() << 8); }
+  f24() { const l = this.f16(); return l | (this.f8() << 16); }
+  rd16(a) { return this.rd(a) | (this.rd((a + 1) & 0xFFFFFF) << 8); }
+  wr16(a, v) { this.wr(a, v & 0xFF); this.wr((a + 1) & 0xFFFFFF, (v >> 8) & 0xFF); }
+  rdb0(a) { return this.rd(a & 0xFFFF) | (this.rd((a + 1) & 0xFFFF) << 8); }
+  push8(v) { this.wr(this.S, v & 0xFF); this.S = this.E ? (0x100 | ((this.S - 1) & 0xFF)) : ((this.S - 1) & 0xFFFF); }
+  pull8() { this.S = this.E ? (0x100 | ((this.S + 1) & 0xFF)) : ((this.S + 1) & 0xFFFF); return this.rd(this.S); }
+  push16(v) { this.push8(v >> 8); this.push8(v); }
+  pull16() { const l = this.pull8(); return l | (this.pull8() << 8); }
+  nz8(v) { this.P = (this.P & 0x7D) | (v & 0x80) | ((v & 0xFF) ? 0 : 2); }
+  nz16(v) { this.P = (this.P & 0x7D) | ((v >> 8) & 0x80) | ((v & 0xFFFF) ? 0 : 2); }
+  setP(v) {
+    this.P = v & 0xFF;
+    if (this.E) this.P |= 0x30;
+    if (this.P & 0x10) { this.X &= 0xFF; this.Y &= 0xFF; }
+  }
+  // addressing modes -> 24-bit address
+  aDP() { return (this.D + this.f8()) & 0xFFFF; }
+  aDPX() { return (this.D + this.f8() + this.X) & 0xFFFF; }
+  aDPY() { return (this.D + this.f8() + this.Y) & 0xFFFF; }
+  aABS() { return (this.DB << 16) | this.f16(); }
+  aABSX() { return (((this.DB << 16) | this.f16()) + this.X) & 0xFFFFFF; }
+  aABSY() { return (((this.DB << 16) | this.f16()) + this.Y) & 0xFFFFFF; }
+  aLONG() { return this.f24(); }
+  aLONGX() { return (this.f24() + this.X) & 0xFFFFFF; }
+  aIND() { return (this.DB << 16) | this.rdb0(this.aDP()); }
+  aINDX() { return (this.DB << 16) | this.rdb0(this.aDPX()); }
+  aINDY() { return (((this.DB << 16) | this.rdb0(this.aDP())) + this.Y) & 0xFFFFFF; }
+  aINDL() { const p = this.aDP(); return this.rdb0(p) | (this.rd((p + 2) & 0xFFFF) << 16); }
+  aINDLY() { return (this.aINDL() + this.Y) & 0xFFFFFF; }
+  aSR() { return (this.S + this.f8()) & 0xFFFF; }
+  aSRY() { return (((this.DB << 16) | this.rdb0(this.aSR())) + this.Y) & 0xFFFFFF; }
+  ea(mode) {
+    switch (mode) {
+      case 0x01: return this.aINDX(); case 0x03: return this.aSR(); case 0x05: return this.aDP();
+      case 0x07: return this.aINDL(); case 0x0D: return this.aABS(); case 0x0F: return this.aLONG();
+      case 0x11: return this.aINDY(); case 0x12: return this.aIND(); case 0x13: return this.aSRY();
+      case 0x15: return this.aDPX(); case 0x17: return this.aINDLY(); case 0x19: return this.aABSY();
+      case 0x1D: return this.aABSX(); case 0x1F: return this.aLONGX();
+    }
+    return 0;
+  }
+  ldM(a) { return (this.P & 0x20) ? this.rd(a) : this.rd16(a); }
+  ldX(a) { return (this.P & 0x10) ? this.rd(a) : this.rd16(a); }
+  immM() { return (this.P & 0x20) ? this.f8() : this.f16(); }
+  immX() { return (this.P & 0x10) ? this.f8() : this.f16(); }
+  stM(a, v) { if (this.P & 0x20) this.wr(a, v & 0xFF); else this.wr16(a, v); }
+  stX(a, v) { if (this.P & 0x10) this.wr(a, v & 0xFF); else this.wr16(a, v); }
+
+  // ALU
+  setA(v) { if (this.P & 0x20) { this.A = (this.A & 0xFF00) | (v & 0xFF); this.nz8(v); } else { this.A = v & 0xFFFF; this.nz16(v); } }
+  ora(v) { this.setA((this.A | v)); }
+  and(v) { this.setA((this.A & v) | ((this.P & 0x20) ? 0 : 0)); }
+  eor(v) { this.setA(this.A ^ v); }
+  adc(v) {
+    const c = this.P & 1;
+    if (this.P & 0x20) {
+      const a = this.A & 0xFF; let r;
+      if (this.P & 8) {
+        r = (a & 0x0F) + (v & 0x0F) + c; if (r > 0x09) r += 0x06;
+        const cc = r > 0x0F ? 0x10 : 0;
+        r = (a & 0xF0) + (v & 0xF0) + cc + (r & 0x0F);
+      } else r = a + v + c;
+      this.P = (this.P & ~0x40) | ((~(a ^ v) & (a ^ r) & 0x80) ? 0x40 : 0);
+      if ((this.P & 8) && r > 0x9F) r += 0x60;
+      this.P = (this.P & ~1) | (r > 0xFF ? 1 : 0);
+      this.A = (this.A & 0xFF00) | (r & 0xFF); this.nz8(r);
+    } else {
+      const a = this.A; let r;
+      if (this.P & 8) {
+        r = (a & 0x000F) + (v & 0x000F) + c; if (r > 0x0009) r += 0x0006;
+        r = (a & 0x00F0) + (v & 0x00F0) + (r > 0x000F ? 0x10 : 0) + (r & 0x000F); if (r > 0x009F) r += 0x0060;
+        r = (a & 0x0F00) + (v & 0x0F00) + (r > 0x00FF ? 0x100 : 0) + (r & 0x00FF); if (r > 0x09FF) r += 0x0600;
+        r = (a & 0xF000) + (v & 0xF000) + (r > 0x0FFF ? 0x1000 : 0) + (r & 0x0FFF);
+      } else r = a + v + c;
+      this.P = (this.P & ~0x40) | ((~(a ^ v) & (a ^ r) & 0x8000) ? 0x40 : 0);
+      if ((this.P & 8) && r > 0x9FFF) r += 0x6000;
+      this.P = (this.P & ~1) | (r > 0xFFFF ? 1 : 0);
+      this.A = r & 0xFFFF; this.nz16(r);
+    }
+  }
+  sbc(v) {
+    if (!(this.P & 8)) { this.adc(v ^ ((this.P & 0x20) ? 0xFF : 0xFFFF)); return; }
+    const c = this.P & 1;
+    if (this.P & 0x20) {
+      const a = this.A & 0xFF; v ^= 0xFF; let r;
+      r = (a & 0x0F) + (v & 0x0F) + c; if (r <= 0x0F) r -= 0x06;
+      const cc = r > 0x0F ? 0x10 : 0;
+      r = (a & 0xF0) + (v & 0xF0) + cc + (r & 0x0F);
+      this.P = (this.P & ~0x40) | ((~(a ^ v) & (a ^ r) & 0x80) ? 0x40 : 0);
+      if (r <= 0xFF) r -= 0x60;
+      this.P = (this.P & ~1) | (r > 0xFF ? 1 : 0);
+      this.A = (this.A & 0xFF00) | (r & 0xFF); this.nz8(r);
+    } else {
+      const a = this.A; v ^= 0xFFFF; let r;
+      r = (a & 0x000F) + (v & 0x000F) + c; if (r <= 0x000F) r -= 0x0006;
+      r = (a & 0x00F0) + (v & 0x00F0) + (r > 0x000F ? 0x10 : 0) + (r & 0x000F); if (r <= 0x00FF) r -= 0x0060;
+      r = (a & 0x0F00) + (v & 0x0F00) + (r > 0x00FF ? 0x100 : 0) + (r & 0x00FF); if (r <= 0x0FFF) r -= 0x0600;
+      r = (a & 0xF000) + (v & 0xF000) + (r > 0x0FFF ? 0x1000 : 0) + (r & 0x0FFF);
+      this.P = (this.P & ~0x40) | ((~(a ^ v) & (a ^ r) & 0x8000) ? 0x40 : 0);
+      if (r <= 0xFFFF) r -= 0x6000;
+      this.P = (this.P & ~1) | (r > 0xFFFF ? 1 : 0);
+      this.A = r & 0xFFFF; this.nz16(r);
+    }
+  }
+  cmp(reg, v, m8) {
+    if (m8) { const r = (reg & 0xFF) - v; this.P = (this.P & ~1) | (r >= 0 ? 1 : 0); this.nz8(r & 0xFF); }
+    else { const r = reg - v; this.P = (this.P & ~1) | (r >= 0 ? 1 : 0); this.nz16(r & 0xFFFF); }
+  }
+  bit(v, imm) {
+    const m8 = this.P & 0x20;
+    const z = (this.A & v & (m8 ? 0xFF : 0xFFFF)) === 0;
+    this.P = (this.P & ~2) | (z ? 2 : 0);
+    if (!imm) {
+      if (m8) this.P = (this.P & 0x3F) | (v & 0xC0);
+      else this.P = (this.P & 0x3F) | ((v >> 8) & 0xC0);
+    }
+  }
+  // RMW ops (value, is8) -> result
+  op_asl(v, m8) { const msb = m8 ? 0x80 : 0x8000, mask = m8 ? 0xFF : 0xFFFF; this.P = (this.P & ~1) | ((v & msb) ? 1 : 0); v = (v << 1) & mask; m8 ? this.nz8(v) : this.nz16(v); return v; }
+  op_lsr(v, m8) { this.P = (this.P & ~1) | (v & 1); v >>= 1; m8 ? this.nz8(v) : this.nz16(v); return v; }
+  op_rol(v, m8) { const msb = m8 ? 0x80 : 0x8000, mask = m8 ? 0xFF : 0xFFFF; const c = this.P & 1; this.P = (this.P & ~1) | ((v & msb) ? 1 : 0); v = ((v << 1) | c) & mask; m8 ? this.nz8(v) : this.nz16(v); return v; }
+  op_ror(v, m8) { const msb = m8 ? 0x80 : 0x8000; const c = this.P & 1; this.P = (this.P & ~1) | (v & 1); v = (v >> 1) | (c ? msb : 0); m8 ? this.nz8(v) : this.nz16(v); return v; }
+  op_inc(v, m8) { v = (v + 1) & (m8 ? 0xFF : 0xFFFF); m8 ? this.nz8(v) : this.nz16(v); return v; }
+  op_dec(v, m8) { v = (v - 1) & (m8 ? 0xFF : 0xFFFF); m8 ? this.nz8(v) : this.nz16(v); return v; }
+  op_tsb(v, m8) { const a = this.A & (m8 ? 0xFF : 0xFFFF); this.P = (this.P & ~2) | ((a & v) ? 0 : 2); return v | a; }
+  op_trb(v, m8) { const a = this.A & (m8 ? 0xFF : 0xFFFF); this.P = (this.P & ~2) | ((a & v) ? 0 : 2); return v & ~a; }
+  rmw(a, fn) {
+    const m8 = (this.P & 0x20) !== 0;
+    if (m8) { const v = this.rd(a); this.idle(); this.wr(a, fn.call(this, v, true)); }
+    else { const v = this.rd16(a); this.idle(); const r = fn.call(this, v, false); this.wr((a + 1) & 0xFFFFFF, r >> 8); this.wr(a, r & 0xFF); }
+  }
+  rmwA(fn) {
+    this.idle();
+    if (this.P & 0x20) this.A = (this.A & 0xFF00) | fn.call(this, this.A & 0xFF, true);
+    else this.A = fn.call(this, this.A, false);
+  }
+  branch(cond) {
+    const r = this.f8();
+    if (cond) { this.idle(); this.PC = (this.PC + ((r << 24) >> 24)) & 0xFFFF; }
+  }
+  interrupt(vecN, vecE, brk) {
+    if (!this.E) { this.push8(this.PB); this.push16(this.PC); this.push8(this.P); }
+    else { this.push16(this.PC); this.push8(brk ? (this.P | 0x10) : (this.P & ~0x10)); }
+    this.P = (this.P | 4) & ~8; this.PB = 0;
+    const v = this.E ? vecE : vecN;
+    this.PC = this.rd(v) | (this.rd(v + 1) << 8);
+    this.idle(2);
+  }
+  incX(v) { return (this.P & 0x10) ? (v & 0xFF) : (v & 0xFFFF); }
+  nzX(v) { (this.P & 0x10) ? this.nz8(v) : this.nz16(v); }
+
+  step() {
+    if (this.nmiPending) { this.nmiPending = false; this.waiting = false; this.interrupt(0xFFEA, 0xFFFA, false); return; }
+    if (this.irqLine && !(this.P & 4)) { this.waiting = false; this.interrupt(0xFFEE, 0xFFFE, false); return; }
+    if (this.waiting || this.stopped) { this.sys.cyc += 8; return; }
+    const op = this.f8();
+    const low = op & 0x1F;
+    // ALU group
+    if (ALU_LOW[low] && op !== 0x89) {
+      {
+        const grp = op >> 5;
+        if (grp === 4) { this.stM(this.ea(low), this.A); return; }
+        const v = low === 0x09 ? this.immM() : this.ldM(this.ea(low));
+        switch (grp) {
+          case 0: this.ora(v); break; case 1: this.and(v); break; case 2: this.eor(v); break;
+          case 3: this.adc(v); break; case 5: this.setA(v); break;
+          case 6: this.cmp(this.A, v, (this.P & 0x20) !== 0); break; case 7: this.sbc(v); break;
+        }
+        return;
+      }
+    }
+    let a, v;
+    switch (op) {
+      case 0x00: this.f8(); this.interrupt(0xFFE6, 0xFFFE, true); break;
+      case 0x02: this.f8(); this.interrupt(0xFFE4, 0xFFF4, false); break;
+      case 0x04: this.rmw(this.aDP(), this.op_tsb); break;
+      case 0x0C: this.rmw(this.aABS(), this.op_tsb); break;
+      case 0x14: this.rmw(this.aDP(), this.op_trb); break;
+      case 0x1C: this.rmw(this.aABS(), this.op_trb); break;
+      case 0x06: this.rmw(this.aDP(), this.op_asl); break;
+      case 0x0E: this.rmw(this.aABS(), this.op_asl); break;
+      case 0x16: this.rmw(this.aDPX(), this.op_asl); break;
+      case 0x1E: this.rmw(this.aABSX(), this.op_asl); break;
+      case 0x0A: this.rmwA(this.op_asl); break;
+      case 0x26: this.rmw(this.aDP(), this.op_rol); break;
+      case 0x2E: this.rmw(this.aABS(), this.op_rol); break;
+      case 0x36: this.rmw(this.aDPX(), this.op_rol); break;
+      case 0x3E: this.rmw(this.aABSX(), this.op_rol); break;
+      case 0x2A: this.rmwA(this.op_rol); break;
+      case 0x46: this.rmw(this.aDP(), this.op_lsr); break;
+      case 0x4E: this.rmw(this.aABS(), this.op_lsr); break;
+      case 0x56: this.rmw(this.aDPX(), this.op_lsr); break;
+      case 0x5E: this.rmw(this.aABSX(), this.op_lsr); break;
+      case 0x4A: this.rmwA(this.op_lsr); break;
+      case 0x66: this.rmw(this.aDP(), this.op_ror); break;
+      case 0x6E: this.rmw(this.aABS(), this.op_ror); break;
+      case 0x76: this.rmw(this.aDPX(), this.op_ror); break;
+      case 0x7E: this.rmw(this.aABSX(), this.op_ror); break;
+      case 0x6A: this.rmwA(this.op_ror); break;
+      case 0xC6: this.rmw(this.aDP(), this.op_dec); break;
+      case 0xCE: this.rmw(this.aABS(), this.op_dec); break;
+      case 0xD6: this.rmw(this.aDPX(), this.op_dec); break;
+      case 0xDE: this.rmw(this.aABSX(), this.op_dec); break;
+      case 0x3A: this.rmwA(this.op_dec); break;
+      case 0xE6: this.rmw(this.aDP(), this.op_inc); break;
+      case 0xEE: this.rmw(this.aABS(), this.op_inc); break;
+      case 0xF6: this.rmw(this.aDPX(), this.op_inc); break;
+      case 0xFE: this.rmw(this.aABSX(), this.op_inc); break;
+      case 0x1A: this.rmwA(this.op_inc); break;
+      case 0x08: this.idle(); this.push8(this.P); break;
+      case 0x28: this.idle(2); this.setP(this.pull8()); break;
+      case 0x0B: this.idle(); this.push16(this.D); break;
+      case 0x2B: this.idle(2); this.D = this.pull16(); this.nz16(this.D); break;
+      case 0x4B: this.idle(); this.push8(this.PB); break;
+      case 0x8B: this.idle(); this.push8(this.DB); break;
+      case 0xAB: this.idle(2); this.DB = this.pull8(); this.nz8(this.DB); break;
+      case 0x48: this.idle(); if (this.P & 0x20) this.push8(this.A); else this.push16(this.A); break;
+      case 0x68: this.idle(2); if (this.P & 0x20) { v = this.pull8(); this.A = (this.A & 0xFF00) | v; this.nz8(v); } else { this.A = this.pull16(); this.nz16(this.A); } break;
+      case 0xDA: this.idle(); if (this.P & 0x10) this.push8(this.X); else this.push16(this.X); break;
+      case 0xFA: this.idle(2); this.X = (this.P & 0x10) ? this.pull8() : this.pull16(); this.nzX(this.X); break;
+      case 0x5A: this.idle(); if (this.P & 0x10) this.push8(this.Y); else this.push16(this.Y); break;
+      case 0x7A: this.idle(2); this.Y = (this.P & 0x10) ? this.pull8() : this.pull16(); this.nzX(this.Y); break;
+      case 0xF4: v = this.f16(); this.push16(v); break; // PEA
+      case 0xD4: a = this.aDP(); this.push16(this.rdb0(a)); break; // PEI
+      case 0x62: v = this.f16(); this.idle(); this.push16((this.PC + v) & 0xFFFF); break; // PER
+      // branches
+      case 0x10: this.branch(!(this.P & 0x80)); break;
+      case 0x30: this.branch(this.P & 0x80); break;
+      case 0x50: this.branch(!(this.P & 0x40)); break;
+      case 0x70: this.branch(this.P & 0x40); break;
+      case 0x90: this.branch(!(this.P & 1)); break;
+      case 0xB0: this.branch(this.P & 1); break;
+      case 0xD0: this.branch(!(this.P & 2)); break;
+      case 0xF0: this.branch(this.P & 2); break;
+      case 0x80: this.branch(true); break;
+      case 0x82: v = this.f16(); this.idle(); this.PC = (this.PC + v) & 0xFFFF; break;
+      // flags
+      case 0x18: this.idle(); this.P &= ~1; break;
+      case 0x38: this.idle(); this.P |= 1; break;
+      case 0x58: this.idle(); this.P &= ~4; break;
+      case 0x78: this.idle(); this.P |= 4; break;
+      case 0xB8: this.idle(); this.P &= ~0x40; break;
+      case 0xD8: this.idle(); this.P &= ~8; break;
+      case 0xF8: this.idle(); this.P |= 8; break;
+      case 0xC2: v = this.f8(); this.idle(); this.setP(this.P & ~v); break;
+      case 0xE2: v = this.f8(); this.idle(); this.setP(this.P | v); break;
+      case 0xFB: { // XCE
+        this.idle();
+        const c = this.P & 1; this.P = (this.P & ~1) | this.E; this.E = c;
+        if (this.E) { this.P |= 0x30; this.X &= 0xFF; this.Y &= 0xFF; this.S = 0x100 | (this.S & 0xFF); }
+        break;
+      }
+      // jumps
+      case 0x4C: this.PC = this.f16(); break;
+      case 0x5C: a = this.f24(); this.PC = a & 0xFFFF; this.PB = a >> 16; break;
+      case 0x6C: a = this.f16(); this.PC = this.rdb0(a); break;
+      case 0x7C: a = (this.f16() + this.X) & 0xFFFF; this.idle(); this.PC = this.rd16((this.PB << 16) | a); break;
+      case 0xDC: a = this.f16(); v = this.rdb0(a); this.PB = this.rd((a + 2) & 0xFFFF); this.PC = v; break;
+      case 0x20: a = this.f16(); this.idle(); this.push16((this.PC - 1) & 0xFFFF); this.PC = a; break;
+      case 0xFC: a = this.f16(); this.push16((this.PC - 1) & 0xFFFF); this.idle(); this.PC = this.rd16((this.PB << 16) | ((a + this.X) & 0xFFFF)); break;
+      case 0x22: a = this.f24(); this.push8(this.PB); this.idle(); this.push16((this.PC - 1) & 0xFFFF); this.PB = a >> 16; this.PC = a & 0xFFFF; break;
+      case 0x60: this.idle(2); this.PC = (this.pull16() + 1) & 0xFFFF; this.idle(); break;
+      case 0x6B: this.idle(2); this.PC = (this.pull16() + 1) & 0xFFFF; this.PB = this.pull8(); break;
+      case 0x40: this.idle(2); this.setP(this.pull8()); this.PC = this.pull16(); if (!this.E) this.PB = this.pull8(); break;
+      // loads/stores misc
+      case 0x89: this.bit(this.immM(), true); break;
+      case 0x24: this.bit(this.ldM(this.aDP())); break;
+      case 0x2C: this.bit(this.ldM(this.aABS())); break;
+      case 0x34: this.bit(this.ldM(this.aDPX())); break;
+      case 0x3C: this.bit(this.ldM(this.aABSX())); break;
+      case 0x64: this.stM(this.aDP(), 0); break;
+      case 0x74: this.stM(this.aDPX(), 0); break;
+      case 0x9C: this.stM(this.aABS(), 0); break;
+      case 0x9E: this.stM(this.aABSX(), 0); break;
+      case 0x84: this.stX(this.aDP(), this.Y); break;
+      case 0x94: this.stX(this.aDPX(), this.Y); break;
+      case 0x8C: this.stX(this.aABS(), this.Y); break;
+      case 0x86: this.stX(this.aDP(), this.X); break;
+      case 0x96: this.stX(this.aDPY(), this.X); break;
+      case 0x8E: this.stX(this.aABS(), this.X); break;
+      case 0xA0: this.Y = this.immX(); this.nzX(this.Y); break;
+      case 0xA4: this.Y = this.ldX(this.aDP()); this.nzX(this.Y); break;
+      case 0xB4: this.Y = this.ldX(this.aDPX()); this.nzX(this.Y); break;
+      case 0xAC: this.Y = this.ldX(this.aABS()); this.nzX(this.Y); break;
+      case 0xBC: this.Y = this.ldX(this.aABSX()); this.nzX(this.Y); break;
+      case 0xA2: this.X = this.immX(); this.nzX(this.X); break;
+      case 0xA6: this.X = this.ldX(this.aDP()); this.nzX(this.X); break;
+      case 0xB6: this.X = this.ldX(this.aDPY()); this.nzX(this.X); break;
+      case 0xAE: this.X = this.ldX(this.aABS()); this.nzX(this.X); break;
+      case 0xBE: this.X = this.ldX(this.aABSY()); this.nzX(this.X); break;
+      case 0xC0: this.cmp(this.Y, this.immX(), (this.P & 0x10) !== 0); break;
+      case 0xC4: this.cmp(this.Y, this.ldX(this.aDP()), (this.P & 0x10) !== 0); break;
+      case 0xCC: this.cmp(this.Y, this.ldX(this.aABS()), (this.P & 0x10) !== 0); break;
+      case 0xE0: this.cmp(this.X, this.immX(), (this.P & 0x10) !== 0); break;
+      case 0xE4: this.cmp(this.X, this.ldX(this.aDP()), (this.P & 0x10) !== 0); break;
+      case 0xEC: this.cmp(this.X, this.ldX(this.aABS()), (this.P & 0x10) !== 0); break;
+      // register ops
+      case 0x88: this.idle(); this.Y = this.incX(this.Y - 1); this.nzX(this.Y); break;
+      case 0xC8: this.idle(); this.Y = this.incX(this.Y + 1); this.nzX(this.Y); break;
+      case 0xCA: this.idle(); this.X = this.incX(this.X - 1); this.nzX(this.X); break;
+      case 0xE8: this.idle(); this.X = this.incX(this.X + 1); this.nzX(this.X); break;
+      case 0xAA: this.idle(); this.X = this.incX(this.A); this.nzX(this.X); break;
+      case 0xA8: this.idle(); this.Y = this.incX(this.A); this.nzX(this.Y); break;
+      case 0x8A: this.idle(); if (this.P & 0x20) { this.A = (this.A & 0xFF00) | (this.X & 0xFF); this.nz8(this.X); } else { this.A = this.X; this.nz16(this.A); } break;
+      case 0x98: this.idle(); if (this.P & 0x20) { this.A = (this.A & 0xFF00) | (this.Y & 0xFF); this.nz8(this.Y); } else { this.A = this.Y; this.nz16(this.A); } break;
+      case 0x9B: this.idle(); this.Y = this.incX(this.X); this.nzX(this.Y); break;
+      case 0xBB: this.idle(); this.X = this.incX(this.Y); this.nzX(this.X); break;
+      case 0x9A: this.idle(); this.S = this.E ? (0x100 | (this.X & 0xFF)) : this.X; break;
+      case 0xBA: this.idle(); this.X = this.incX(this.S); this.nzX(this.X); break;
+      case 0x1B: this.idle(); this.S = this.E ? (0x100 | (this.A & 0xFF)) : this.A; break;
+      case 0x3B: this.idle(); this.A = this.S; this.nz16(this.A); break;
+      case 0x5B: this.idle(); this.D = this.A; this.nz16(this.D); break;
+      case 0x7B: this.idle(); this.A = this.D; this.nz16(this.A); break;
+      case 0xEB: this.idle(2); this.A = ((this.A >> 8) | (this.A << 8)) & 0xFFFF; this.nz8(this.A & 0xFF); break;
+      case 0xEA: this.idle(); break;
+      case 0x42: this.f8(); break; // WDM
+      case 0xCB: this.idle(2); this.waiting = true; break;
+      case 0xDB: this.stopped = true; break;
+      case 0x44: case 0x54: { // MVP / MVN
+        const dst = this.f8(), src = this.f8();
+        this.DB = dst;
+        v = this.rd((src << 16) | this.X);
+        this.wr((dst << 16) | this.Y, v);
+        const d = op === 0x54 ? 1 : -1;
+        this.X = this.incX(this.X + d); this.Y = this.incX(this.Y + d);
+        this.A = (this.A - 1) & 0xFFFF;
+        this.idle(2);
+        if (this.A !== 0xFFFF) this.PC = (this.PC - 3) & 0xFFFF;
+        break;
+      }
+      default: break;
+    }
+  }
+}
+// ===== PPU =====
+const BPP_TABLE = [[2, 2, 2, 2], [4, 4, 2, 0], [4, 4, 0, 0], [8, 4, 0, 0], [8, 2, 0, 0], [4, 2, 0, 0], [4, 0, 0, 0], [8, 0, 0, 0]];
+const OBJ_SIZES = [[8, 8, 16, 16], [8, 8, 32, 32], [8, 8, 64, 64], [16, 16, 32, 32], [16, 16, 64, 64], [32, 32, 64, 64], [16, 32, 32, 64], [16, 32, 32, 32]];
+// z order: [bg1L,bg1H,bg2L,bg2H,bg3L,bg3H,bg4L,bg4H], obj[0..3]
+const Z_BG = [
+  [8, 11, 7, 10, 2, 5, 1, 4], [6, 9, 5, 8, 1, 3, 0, 0], [3, 7, 1, 5, 0, 0, 0, 0], [3, 7, 1, 5, 0, 0, 0, 0],
+  [3, 7, 1, 5, 0, 0, 0, 0], [3, 7, 1, 5, 0, 0, 0, 0], [3, 7, 1, 5, 0, 0, 0, 0], [3, 3, 1, 5, 0, 0, 0, 0]];
+const Z_OBJ = [[3, 6, 9, 12], [2, 4, 7, 10], [2, 4, 6, 8], [2, 4, 6, 8], [2, 4, 6, 8], [2, 4, 6, 8], [2, 4, 6, 8], [2, 4, 6, 7]];
+
+class PPU {
+  constructor(sys) {
+    this.sys = sys;
+    this.vram = new Uint8Array(0x10000);
+    this.cgram = new Uint16Array(256);
+    this.oam = new Uint8Array(544);
+    this.image = new Uint32Array(256 * 224);
+    this.lut = new Uint32Array(32768);
+    this.lutBright = -1;
+    this.bgCol = [0, 1, 2, 3].map(() => new Int32Array(256));
+    this.bgPri = [0, 1, 2, 3].map(() => new Uint8Array(256));
+    this.objCol = new Int32Array(256); this.objPri = new Uint8Array(256); this.objMath = new Uint8Array(256);
+    this.mainC = new Uint16Array(256); this.mainZ = new Uint8Array(256); this.mainL = new Uint8Array(256);
+    this.subC = new Uint16Array(256); this.subZ = new Uint8Array(256); this.subL = new Uint8Array(256);
+    this.winBuf = [0, 1, 2, 3, 4, 5].map(() => new Uint8Array(256));
+    this.winOn = new Uint8Array(6);
+    this.rowBuf = new Uint8Array(8);
+    this.reset();
+  }
+  reset() {
+    this.inidisp = 0x80; this.obsel = 0; this.oamAddr = 0; this.oamReload = 0; this.oamLatch = 0; this.oamPri = 0;
+    this.bgmode = 0; this.mosaic = 0; this.bgsc = [0, 0, 0, 0]; this.nba = [0, 0, 0, 0];
+    this.hofs = [0, 0, 0, 0]; this.vofs = [0, 0, 0, 0]; this.ofsPrev = 0; this.ofsPrev2 = 0;
+    this.vmain = 0; this.vaddr = 0; this.vlatch = 0;
+    this.m7sel = 0; this.m7 = [0, 0, 0, 0, 0, 0]; this.m7prev = 0; this.m7hofs = 0; this.m7vofs = 0;
+    this.cgAddr = 0; this.cgLatch = 0; this.cgFlip = 0;
+    this.w12sel = 0; this.w34sel = 0; this.wobjsel = 0; this.wl1 = 0; this.wr1 = 0; this.wl2 = 0; this.wr2 = 0;
+    this.wbglog = 0; this.wobjlog = 0; this.tm = 0; this.ts = 0; this.tmw = 0; this.tsw = 0;
+    this.cgwsel = 0; this.cgadsub = 0; this.fixed = 0; this.setini = 0;
+    this.mult = 0; this.hcount = 0; this.vcount = 0; this.hflip = 0; this.vflipc = 0; this.latched = 0;
+  }
+  vword(w) { w = (w & 0x7FFF) << 1; return this.vram[w] | (this.vram[w + 1] << 8); }
+  remap(a) {
+    switch ((this.vmain >> 2) & 3) {
+      case 0: return a & 0x7FFF;
+      case 1: return ((a & 0xFF00) | ((a & 0x1F) << 3) | ((a >> 5) & 7)) & 0x7FFF;
+      case 2: return ((a & 0xFE00) | ((a & 0x3F) << 3) | ((a >> 6) & 7)) & 0x7FFF;
+      default: return ((a & 0xFC00) | ((a & 0x7F) << 3) | ((a >> 7) & 7)) & 0x7FFF;
+    }
+  }
+  vinc() { const s = [1, 32, 128, 128][this.vmain & 3]; this.vaddr = (this.vaddr + s) & 0xFFFF; }
+  m7mul() { const a = (this.m7[0] << 16) >> 16; const b = (this.m7[1] << 16) >> 24; this.mult = (a * b) & 0xFFFFFF; }
+  write(reg, v) {
+    switch (reg) {
+      case 0x00: if ((this.inidisp & 0x80) && !(v & 0x80)) this.oamAddr = this.oamReload; this.inidisp = v; break;
+      case 0x01: this.obsel = v; break;
+      case 0x02: this.oamReload = (this.oamReload & 0x200) | (v << 1); this.oamAddr = this.oamReload; break;
+      case 0x03: this.oamReload = ((v & 1) << 9) | (this.oamReload & 0x1FE); this.oamPri = v & 0x80; this.oamAddr = this.oamReload; break;
+      case 0x04: {
+        const a = this.oamAddr;
+        if (a < 512) {
+          if (!(a & 1)) this.oamLatch = v;
+          else { this.oam[a - 1] = this.oamLatch; this.oam[a] = v; }
+        } else this.oam[512 + (a & 0x1F)] = v;
+        this.oamAddr = (a + 1) & 0x3FF;
+        break;
+      }
+      case 0x05: this.bgmode = v; break;
+      case 0x06: this.mosaic = v; break;
+      case 0x07: case 0x08: case 0x09: case 0x0A: this.bgsc[reg - 7] = v; break;
+      case 0x0B: this.nba[0] = v & 15; this.nba[1] = v >> 4; break;
+      case 0x0C: this.nba[2] = v & 15; this.nba[3] = v >> 4; break;
+      case 0x0D: case 0x0F: case 0x11: case 0x13: {
+        const n = (reg - 0x0D) >> 1;
+        this.hofs[n] = ((v << 8) | (this.ofsPrev & ~7) | ((this.hofs[n] >> 8) & 7)) & 0xFFFF;
+        this.ofsPrev = v;
+        if (n === 0) { this.m7hofs = ((v << 8) | this.m7prev) & 0x1FFF; this.m7prev = v; }
+        break;
+      }
+      case 0x0E: case 0x10: case 0x12: case 0x14: {
+        const n = (reg - 0x0E) >> 1;
+        this.vofs[n] = ((v << 8) | this.ofsPrev) & 0xFFFF;
+        this.ofsPrev = v;
+        if (n === 0) { this.m7vofs = ((v << 8) | this.m7prev) & 0x1FFF; this.m7prev = v; }
+        break;
+      }
+      case 0x15: this.vmain = v; break;
+      case 0x16: this.vaddr = (this.vaddr & 0xFF00) | v; this.vlatch = this.vword(this.remap(this.vaddr)); break;
+      case 0x17: this.vaddr = (this.vaddr & 0xFF) | (v << 8); this.vlatch = this.vword(this.remap(this.vaddr)); break;
+      case 0x18: { const w = this.remap(this.vaddr); this.vram[w << 1] = v; if (!(this.vmain & 0x80)) this.vinc(); break; }
+      case 0x19: { const w = this.remap(this.vaddr); this.vram[(w << 1) + 1] = v; if (this.vmain & 0x80) this.vinc(); break; }
+      case 0x1A: this.m7sel = v; break;
+      case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x1F: case 0x20:
+        this.m7[reg - 0x1B] = ((v << 8) | this.m7prev) & 0xFFFF; this.m7prev = v;
+        if (reg <= 0x1C) this.m7mul();
+        break;
+      case 0x21: this.cgAddr = v; this.cgFlip = 0; break;
+      case 0x22:
+        if (!this.cgFlip) this.cgLatch = v;
+        else { this.cgram[this.cgAddr] = ((v << 8) | this.cgLatch) & 0x7FFF; this.cgAddr = (this.cgAddr + 1) & 0xFF; }
+        this.cgFlip ^= 1; break;
+      case 0x23: this.w12sel = v; break;
+      case 0x24: this.w34sel = v; break;
+      case 0x25: this.wobjsel = v; break;
+      case 0x26: this.wl1 = v; break;
+      case 0x27: this.wr1 = v; break;
+      case 0x28: this.wl2 = v; break;
+      case 0x29: this.wr2 = v; break;
+      case 0x2A: this.wbglog = v; break;
+      case 0x2B: this.wobjlog = v; break;
+      case 0x2C: this.tm = v; break;
+      case 0x2D: this.ts = v; break;
+      case 0x2E: this.tmw = v; break;
+      case 0x2F: this.tsw = v; break;
+      case 0x30: this.cgwsel = v; break;
+      case 0x31: this.cgadsub = v; break;
+      case 0x32: {
+        const c = v & 31;
+        if (v & 0x20) this.fixed = (this.fixed & ~0x1F) | c;
+        if (v & 0x40) this.fixed = (this.fixed & ~0x3E0) | (c << 5);
+        if (v & 0x80) this.fixed = (this.fixed & ~0x7C00) | (c << 10);
+        break;
+      }
+      case 0x33: this.setini = v; break;
+    }
+  }
+  read(reg, mdr) {
+    switch (reg) {
+      case 0x34: return this.mult & 0xFF;
+      case 0x35: return (this.mult >> 8) & 0xFF;
+      case 0x36: return (this.mult >> 16) & 0xFF;
+      case 0x37: this.hcount = (this.sys.cyc >> 2) & 0x1FF; this.vcount = this.sys.line; this.latched = 1; return mdr;
+      case 0x38: {
+        const a = this.oamAddr; const v = a < 512 ? this.oam[a] : this.oam[512 + (a & 0x1F)];
+        this.oamAddr = (a + 1) & 0x3FF; return v;
+      }
+      case 0x39: { const v = this.vlatch & 0xFF; if (!(this.vmain & 0x80)) { this.vlatch = this.vword(this.remap(this.vaddr)); this.vinc(); } return v; }
+      case 0x3A: { const v = this.vlatch >> 8; if (this.vmain & 0x80) { this.vlatch = this.vword(this.remap(this.vaddr)); this.vinc(); } return v; }
+      case 0x3B: { const c = this.cgram[this.cgAddr]; let v; if (!this.cgFlip) v = c & 0xFF; else { v = c >> 8; this.cgAddr = (this.cgAddr + 1) & 0xFF; } this.cgFlip ^= 1; return v; }
+      case 0x3C: { const v = this.hflip ? (this.hcount >> 8) : (this.hcount & 0xFF); this.hflip ^= 1; return v; }
+      case 0x3D: { const v = this.vflipc ? (this.vcount >> 8) : (this.vcount & 0xFF); this.vflipc ^= 1; return v; }
+      case 0x3E: return 0x01;
+      case 0x3F: { const v = (this.latched ? 0x40 : 0) | 0x03; this.latched = 0; this.hflip = 0; this.vflipc = 0; return v; }
+    }
+    return mdr;
+  }
+  buildLut(b) {
+    this.lutBright = b;
+    const lut = this.lut;
+    for (let c = 0; c < 32768; c++) {
+      let r = c & 31, g = (c >> 5) & 31, bl = (c >> 10) & 31;
+      r = ((r << 3) | (r >> 2)) * b / 15 | 0; g = ((g << 3) | (g >> 2)) * b / 15 | 0; bl = ((bl << 3) | (bl >> 2)) * b / 15 | 0;
+      lut[c] = 0xFF000000 | (bl << 16) | (g << 8) | r;
+    }
+  }
+  // ---------- window ----------
+  calcWindow(idx, sel, logic) {
+    const buf = this.winBuf[idx];
+    const w1 = sel & 2, w1i = sel & 1, w2 = sel & 8, w2i = sel & 4;
+    if (!w1 && !w2) { this.winOn[idx] = 0; return; }
+    this.winOn[idx] = 1;
+    const l1 = this.wl1, r1 = this.wr1, l2 = this.wl2, r2 = this.wr2;
+    for (let x = 0; x < 256; x++) {
+      let a = (x >= l1 && x <= r1) ? 1 : 0; if (w1i) a ^= 1;
+      let b = (x >= l2 && x <= r2) ? 1 : 0; if (w2i) b ^= 1;
+      let r;
+      if (w1 && w2) {
+        switch (logic & 3) { case 0: r = a | b; break; case 1: r = a & b; break; case 2: r = a ^ b; break; default: r = (a ^ b) ^ 1; }
+      } else r = w1 ? a : b;
+      buf[x] = r;
+    }
+  }
+  // ---------- BG ----------
+  renderBG(layer, y, bpp, mode) {
+    const col = this.bgCol[layer], pri = this.bgPri[layer];
+    const sc = this.bgsc[layer];
+    const mapBase = (sc & 0xFC) << 8, size = sc & 3;
+    const charBase = this.nba[layer] << 12;
+    const hires = mode === 5 || mode === 6;
+    const big = (this.bgmode >> (4 + layer)) & 1;
+    const tileH = big ? 16 : 8, tileW = hires ? 16 : tileH;
+    const shW = tileW === 16 ? 4 : 3, shH = tileH === 16 ? 4 : 3;
+    const hofs = this.hofs[layer] & 0x3FF, vofs = this.vofs[layer] & 0x3FF;
+    const msz = (this.mosaic & (1 << layer)) ? (this.mosaic >> 4) + 1 : 1;
+    const yy = msz > 1 ? y - (y % msz) : y;
+    const py = (yy + vofs) & 0x3FF;
+    const tyFull = py >> shH;
+    let pyIn = py & (tileH - 1);
+    const palBaseMode = mode === 0 ? layer * 32 : 0;
+    const tileWords = bpp * 4;
+    const rowBuf = this.rowBuf;
+    const vram = this.vram, cgram = this.cgram;
+    let lastChunk = -1, palBase = 0, prio = 0;
+    for (let x = 0; x < 256; x++) {
+      const xx = msz > 1 ? x - (x % msz) : x;
+      const px = (hires ? (xx * 2 + hofs) : (xx + hofs)) & 0x7FF;
+      const chunk = px >> 3;
+      if (chunk !== lastChunk) {
+        lastChunk = chunk;
+        const tx = (px >> shW) & 63, ty = tyFull & 63;
+        let off = ((ty & 31) << 5) | (tx & 31);
+        if ((tx & 32) && (size & 1)) off += 0x400;
+        if ((ty & 32) && (size & 2)) off += (size & 1) ? 0x800 : 0x400;
+        const wa = ((mapBase + off) & 0x7FFF) << 1;
+        const entry = vram[wa] | (vram[wa + 1] << 8);
+        const hf = entry & 0x4000, vf = entry & 0x8000;
+        let subX = (px & (tileW - 1)) >> 3;
+        if (hf && tileW === 16) subX ^= 1;
+        let pin = vf ? (tileH - 1 - pyIn) : pyIn;
+        const tile = ((entry & 0x3FF) + subX + ((pin >> 3) << 4)) & 0x3FF;
+        const row = pin & 7;
+        const ta = charBase + tile * tileWords + row;
+        for (let i = 0; i < 8; i++) rowBuf[i] = 0;
+        for (let p = 0; p < bpp; p += 2) {
+          const w = ((ta + p * 4) & 0x7FFF) << 1;
+          const lo = vram[w], hi = vram[w + 1];
+          for (let i = 0; i < 8; i++) {
+            const bitn = 7 - i;
+            rowBuf[i] |= (((lo >> bitn) & 1) << p) | (((hi >> bitn) & 1) << (p + 1));
+          }
+        }
+        if (hf) { for (let i = 0; i < 4; i++) { const t = rowBuf[i]; rowBuf[i] = rowBuf[7 - i]; rowBuf[7 - i] = t; } }
+        const pal = (entry >> 10) & 7;
+        palBase = bpp === 2 ? palBaseMode + pal * 4 : bpp === 4 ? pal * 16 : 0;
+        prio = (entry >> 13) & 1;
+      }
+      const pix = rowBuf[px & 7];
+      if (pix) { col[x] = cgram[palBase + pix]; pri[x] = prio; } else col[x] = -1;
+    }
+  }
+  renderMode7(y, extbg) {
+    const col0 = this.bgCol[0], col1 = this.bgCol[1], pri1 = this.bgPri[1], pri0 = this.bgPri[0];
+    const s16 = v => (v << 16) >> 16, s13 = v => (v << 19) >> 19;
+    const a = s16(this.m7[0]), b = s16(this.m7[1]), c = s16(this.m7[2]), d = s16(this.m7[3]);
+    const cx = s13(this.m7[4]), cy = s13(this.m7[5]);
+    const hofs = s13(this.m7hofs), vofs = s13(this.m7vofs);
+    const clip = n => (n & 0x2000) ? (n | ~1023) : (n & 1023);
+    let sy = (this.m7sel & 2) ? 255 - y : y;
+    const hx = clip(hofs - cx), vy = clip(vofs - cy);
+    const psx = ((a * hx) & ~63) + ((b * vy) & ~63) + ((b * sy) & ~63) + (cx << 8);
+    const psy = ((c * hx) & ~63) + ((d * vy) & ~63) + ((d * sy) & ~63) + (cy << 8);
+    const repeat = this.m7sel >> 6;
+    const vram = this.vram, cgram = this.cgram;
+    for (let x = 0; x < 256; x++) {
+      const sx = (this.m7sel & 1) ? 255 - x : x;
+      let tx = (psx + a * sx) >> 8, ty = (psy + c * sx) >> 8;
+      let pix;
+      const out = (tx | ty) & ~1023;
+      if (out && repeat === 2) pix = 0;
+      else {
+        let tile;
+        if (out && repeat === 3) tile = 0;
+        else { tx &= 1023; ty &= 1023; tile = vram[(((ty >> 3) << 7) | (tx >> 3)) << 1]; }
+        pix = vram[(((tile << 6) | ((ty & 7) << 3) | (tx & 7)) << 1) + 1];
+      }
+      if (pix) { col0[x] = cgram[pix]; pri0[x] = 0; } else col0[x] = -1;
+      if (extbg) { const p = pix & 0x7F; if (p) { col1[x] = cgram[p]; pri1[x] = pix >> 7; } else col1[x] = -1; }
+    }
+  }
+  renderOBJ(y) {
+    const col = this.objCol, pri = this.objPri, mth = this.objMath;
+    col.fill(-1);
+    const sizes = OBJ_SIZES[this.obsel >> 5];
+    const nameBase = (this.obsel & 7) << 13;
+    const nameGap = (((this.obsel >> 3) & 3) + 1) << 12;
+    const oam = this.oam, vram = this.vram, cgram = this.cgram;
+    for (let i = 127; i >= 0; i--) {
+      const o = i << 2;
+      const hi = (oam[512 + (i >> 2)] >> ((i & 3) << 1)) & 3;
+      const sy = oam[o + 1];
+      const big = hi & 2;
+      const w = big ? sizes[2] : sizes[0], h = big ? sizes[3] : sizes[1];
+      let row = (y - sy) & 0xFF;
+      if (row >= h) continue;
+      let x = oam[o] | ((hi & 1) << 8); if (x >= 256) x -= 512;
+      if (x + w <= 0 || x >= 256) continue;
+      const attr = oam[o + 3];
+      if (attr & 0x80) row = h - 1 - row;
+      const hflip = attr & 0x40;
+      const pal = 128 + ((attr >> 1) & 7) * 16;
+      const p = (attr >> 4) & 3;
+      const math = ((attr >> 1) & 7) >= 4 ? 1 : 0;
+      const t = oam[o + 2] | ((attr & 1) << 8);
+      const cy = row >> 3, r = row & 7;
+      for (let cxo = 0; cxo < w; cxo += 8) {
+        const sxBase = x + cxo;
+        if (sxBase + 8 <= 0 || sxBase >= 256) continue;
+        const cx = hflip ? ((w - 8 - cxo) >> 3) : (cxo >> 3);
+        const tnum = (t & 0x100) | ((((t >> 4) + cy) & 0xF) << 4) | ((t + cx) & 0xF);
+        const addr = nameBase + ((tnum & 0xFF) << 4) + ((tnum & 0x100) ? nameGap : 0);
+        const w0 = ((addr + r) & 0x7FFF) << 1, w1 = ((addr + 8 + r) & 0x7FFF) << 1;
+        const b0 = vram[w0], b1 = vram[w0 + 1], b2 = vram[w1], b3 = vram[w1 + 1];
+        for (let k = 0; k < 8; k++) {
+          const sx = sxBase + k; if (sx < 0 || sx >= 256) continue;
+          const bitn = hflip ? k : 7 - k;
+          const pix = ((b0 >> bitn) & 1) | (((b1 >> bitn) & 1) << 1) | (((b2 >> bitn) & 1) << 2) | (((b3 >> bitn) & 1) << 3);
+          if (pix) { col[sx] = cgram[pal + pix]; pri[sx] = p; mth[sx] = math; }
+        }
+      }
+    }
+  }
+  renderLine(y) {
+    if (y < 1 || y > 224) return;
+    const out = this.image; const ob = (y - 1) * 256;
+    const bright = this.inidisp & 15;
+    if ((this.inidisp & 0x80) || bright === 0) { out.fill(0xFF000000, ob, ob + 256); return; }
+    if (bright !== this.lutBright) this.buildLut(bright);
+    const mode = this.bgmode & 7;
+    const bpps = BPP_TABLE[mode];
+    const used = this.tm | this.ts;
+    const extbg = mode === 7 && (this.setini & 0x40);
+    if (mode === 7) { if (used & 3) this.renderMode7(y, extbg); }
+    else for (let l = 0; l < 4; l++) if (bpps[l] && (used & (1 << l))) this.renderBG(l, y, bpps[l], mode);
+    if (used & 0x10) this.renderOBJ(y);
+    // windows
+    this.calcWindow(0, this.w12sel & 15, this.wbglog);
+    this.calcWindow(1, this.w12sel >> 4, this.wbglog >> 2);
+    this.calcWindow(2, this.w34sel & 15, this.wbglog >> 4);
+    this.calcWindow(3, this.w34sel >> 4, this.wbglog >> 6);
+    this.calcWindow(4, this.wobjsel & 15, this.wobjlog);
+    this.calcWindow(5, this.wobjsel >> 4, this.wobjlog >> 2);
+    const zbg = Z_BG[mode], zobj = Z_OBJ[mode];
+    const bg3top = mode === 1 && (this.bgmode & 8);
+    // main / sub compose
+    this.compose(this.tm, this.tmw, this.mainC, this.mainZ, this.mainL, this.cgram[0], mode, bpps, zbg, zobj, bg3top, extbg);
+    this.compose(this.ts, this.tsw, this.subC, this.subZ, this.subL, this.fixed, mode, bpps, zbg, zobj, bg3top, extbg);
+    // color math
+    const lut = this.lut, cw = this.winBuf[5], cwOn = this.winOn[5];
+    const clipR = this.cgwsel >> 6, prevR = (this.cgwsel >> 4) & 3, addSub = this.cgwsel & 2;
+    const adsub = this.cgadsub, sub = adsub & 0x80, halfEn = adsub & 0x40;
+    const fixed = this.fixed;
+    for (let x = 0; x < 256; x++) {
+      let c = this.mainC[x];
+      const L = this.mainL[x];
+      const inW = cwOn ? cw[x] : 0;
+      const clip = clipR === 3 || (clipR === 1 && !inW) || (clipR === 2 && inW);
+      const prev = prevR === 3 || (prevR === 1 && !inW) || (prevR === 2 && inW);
+      if (clip) c = 0;
+      let en = (adsub >> L) & 1;
+      if (L === 4 && !this.objMath[x]) en = 0;
+      if (en && !prev) {
+        let o, half = halfEn && !clip;
+        if (addSub) { if (this.subL[x] === 5) { o = fixed; half = false; } else o = this.subC[x]; }
+        else o = fixed;
+        let r = c & 31, g = (c >> 5) & 31, b = (c >> 10) & 31;
+        const r2 = o & 31, g2 = (o >> 5) & 31, b2 = (o >> 10) & 31;
+        if (sub) { r -= r2; g -= g2; b -= b2; if (r < 0) r = 0; if (g < 0) g = 0; if (b < 0) b = 0; }
+        else { r += r2; g += g2; b += b2; }
+        if (half) { r >>= 1; g >>= 1; b >>= 1; }
+        if (r > 31) r = 31; if (g > 31) g = 31; if (b > 31) b = 31;
+        c = r | (g << 5) | (b << 10);
+      }
+      out[ob + x] = lut[c];
+    }
+  }
+  compose(enable, winMask, C, Z, Lr, backdrop, mode, bpps, zbg, zobj, bg3top, extbg) {
+    C.fill(backdrop); Z.fill(0); Lr.fill(5);
+    for (let l = 0; l < 4; l++) {
+      if (!(enable & (1 << l))) continue;
+      if (mode === 7) { if (l > 1 || (l === 1 && !extbg)) continue; }
+      else if (!bpps[l]) continue;
+      const col = this.bgCol[l], pri = this.bgPri[l];
+      const useWin = (winMask & (1 << l)) && this.winOn[l]; const wb = this.winBuf[l];
+      const zl = zbg[l * 2], zh = (l === 2 && bg3top) ? 13 : zbg[l * 2 + 1];
+      for (let x = 0; x < 256; x++) {
+        const c = col[x]; if (c < 0) continue;
+        if (useWin && wb[x]) continue;
+        const z = pri[x] ? zh : zl;
+        if (z > Z[x]) { Z[x] = z; C[x] = c; Lr[x] = l; }
+      }
+    }
+    if (enable & 0x10) {
+      const col = this.objCol, pri = this.objPri;
+      const useWin = (winMask & 0x10) && this.winOn[4]; const wb = this.winBuf[4];
+      for (let x = 0; x < 256; x++) {
+        const c = col[x]; if (c < 0) continue;
+        if (useWin && wb[x]) continue;
+        const z = zobj[pri[x]];
+        if (z > Z[x]) { Z[x] = z; C[x] = c; Lr[x] = 4; }
+      }
+    }
+  }
+}
+// ===== APU: SPC700 + S-DSP =====
+const IPL_ROM = [
+  0xCD, 0xEF, 0xBD, 0xE8, 0x00, 0xC6, 0x1D, 0xD0, 0xFC, 0x8F, 0xAA, 0xF4, 0x8F, 0xBB, 0xF5, 0x78,
+  0xCC, 0xF4, 0xD0, 0xFB, 0x2F, 0x19, 0xEB, 0xF4, 0xD0, 0xFC, 0x7E, 0xF4, 0xD0, 0x0B, 0xE4, 0xF5,
+  0xCB, 0xF4, 0xD7, 0x00, 0xFC, 0xD0, 0xF3, 0xAB, 0x01, 0x10, 0xEF, 0x7E, 0xF4, 0x10, 0xEB, 0xBA,
+  0xF6, 0xDA, 0x00, 0xBA, 0xF4, 0xC4, 0xF4, 0xDD, 0x5D, 0xD0, 0xDB, 0x1F, 0x00, 0x00, 0xC0, 0xFF];
+const SPC_CYC = [
+  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 5, 4, 5, 4, 6, 8, 2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 6, 5, 2, 2, 4, 6,
+  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 5, 4, 5, 4, 5, 4, 2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 6, 5, 2, 2, 3, 8,
+  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 4, 4, 5, 4, 6, 6, 2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 4, 5, 2, 2, 4, 3,
+  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 4, 4, 5, 4, 5, 5, 2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 5, 5, 2, 2, 3, 6,
+  2, 8, 4, 5, 3, 4, 3, 6, 2, 6, 5, 4, 5, 2, 4, 5, 2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 5, 5, 2, 2, 12, 5,
+  3, 8, 4, 5, 3, 4, 3, 6, 2, 6, 4, 4, 5, 2, 4, 4, 2, 8, 4, 5, 4, 5, 5, 6, 5, 5, 5, 5, 2, 2, 3, 4,
+  3, 8, 4, 5, 4, 5, 4, 7, 2, 5, 6, 4, 5, 2, 4, 9, 2, 8, 4, 5, 5, 6, 6, 7, 4, 5, 5, 5, 2, 2, 6, 3,
+  2, 8, 4, 5, 3, 4, 3, 6, 2, 4, 5, 3, 4, 3, 4, 3, 2, 8, 4, 5, 4, 5, 5, 6, 3, 4, 5, 4, 2, 2, 4, 3];
+const RATE_TABLE = [0, 2048, 1536, 1280, 1024, 768, 640, 512, 384, 320, 256, 192, 160, 128, 96, 80, 64, 48, 40, 32, 24, 20, 16, 12, 10, 8, 6, 5, 4, 3, 2, 1];
+
+class APU {
+  constructor() {
+    this.ram = new Uint8Array(0x10000);
+    this.dsp = new DSP(this);
+    this.reset();
+  }
+  reset() {
+    this.A = 0; this.X = 0; this.Y = 0; this.SP = 0xEF; this.PSW = 0x02;
+    this.ipl = true; this.portIn = [0, 0, 0, 0]; this.portOut = [0, 0, 0, 0];
+    this.tEn = [0, 0, 0]; this.tTarget = [0, 0, 0]; this.tStage = [0, 0, 0]; this.tInner = [0, 0, 0]; this.tOut = [0, 0, 0];
+    this.dspAddr = 0; this.cycles = 0; this.sampleCyc = 0; this.halted = false;
+    this.dsp.reset();
+    this.PC = IPL_ROM[62] | (IPL_ROM[63] << 8);
+  }
+  rd(a) {
+    a &= 0xFFFF;
+    if (a >= 0xF0 && a < 0x100) {
+      switch (a) {
+        case 0xF2: return this.dspAddr;
+        case 0xF3: return this.dsp.read(this.dspAddr & 0x7F);
+        case 0xF4: case 0xF5: case 0xF6: case 0xF7: return this.portIn[a - 0xF4];
+        case 0xFD: case 0xFE: case 0xFF: { const v = this.tOut[a - 0xFD]; this.tOut[a - 0xFD] = 0; return v; }
+        case 0xF8: case 0xF9: return this.ram[a];
+        default: return 0;
+      }
+    }
+    if (a >= 0xFFC0 && this.ipl) return IPL_ROM[a - 0xFFC0];
+    return this.ram[a];
+  }
+  wr(a, v) {
+    a &= 0xFFFF;
+    if (a >= 0xF0 && a < 0x100) {
+      switch (a) {
+        case 0xF1:
+          for (let i = 0; i < 3; i++) {
+            const en = (v >> i) & 1;
+            if (en && !this.tEn[i]) { this.tInner[i] = 0; this.tOut[i] = 0; }
+            this.tEn[i] = en;
+          }
+          if (v & 0x10) { this.portIn[0] = 0; this.portIn[1] = 0; }
+          if (v & 0x20) { this.portIn[2] = 0; this.portIn[3] = 0; }
+          this.ipl = (v & 0x80) !== 0;
+          break;
+        case 0xF2: this.dspAddr = v; break;
+        case 0xF3: if (this.dspAddr < 0x80) this.dsp.write(this.dspAddr, v); break;
+        case 0xF4: case 0xF5: case 0xF6: case 0xF7: this.portOut[a - 0xF4] = v; break;
+        case 0xFA: case 0xFB: case 0xFC: this.tTarget[a - 0xFA] = v; break;
+      }
+    }
+    this.ram[a] = v;
+  }
+  f8() { const v = this.rd(this.PC); this.PC = (this.PC + 1) & 0xFFFF; return v; }
+  f16() { const l = this.f8(); return l | (this.f8() << 8); }
+  dp(a) { return ((this.PSW & 0x20) << 3) | (a & 0xFF); }
+  rdw(a) { return this.rd(a) | (this.rd((a + 1) & 0xFFFF) << 8); }
+  rdDPW(o) { return this.rd(this.dp(o)) | (this.rd(this.dp(o + 1)) << 8); }
+  push(v) { this.ram[0x100 | this.SP] = v & 0xFF; this.SP = (this.SP - 1) & 0xFF; }
+  pop() { this.SP = (this.SP + 1) & 0xFF; return this.ram[0x100 | this.SP]; }
+  nz(v) { this.PSW = (this.PSW & 0x7D) | (v & 0x80) | ((v & 0xFF) ? 0 : 2); }
+  setC(c) { this.PSW = (this.PSW & ~1) | (c ? 1 : 0); }
+  get YA() { return (this.Y << 8) | this.A; }
+  setYA(v) { this.Y = (v >> 8) & 0xFF; this.A = v & 0xFF; }
+  nz16(v) { this.PSW = (this.PSW & 0x7D) | ((v >> 8) & 0x80) | ((v & 0xFFFF) ? 0 : 2); }
+
+  adc(a, b) {
+    const r = a + b + (this.PSW & 1);
+    this.PSW = (this.PSW & ~0x49) | (r > 0xFF ? 1 : 0) | ((~(a ^ b) & (a ^ r) & 0x80) ? 0x40 : 0) | (((a ^ b ^ r) & 0x10) ? 8 : 0);
+    this.nz(r & 0xFF); return r & 0xFF;
+  }
+  sbc(a, b) { return this.adc(a, b ^ 0xFF); }
+  cmp(a, b) { const r = a - b; this.setC(r >= 0); this.nz(r & 0xFF); }
+  alu(op, a, b) {
+    switch (op) {
+      case 0: a |= b; this.nz(a); return a;
+      case 1: a &= b; this.nz(a); return a;
+      case 2: a ^= b; this.nz(a); return a;
+      case 3: this.cmp(a, b); return -1;
+      case 4: return this.adc(a, b);
+      default: return this.sbc(a, b);
+    }
+  }
+  branch(c) { const r = this.f8(); if (c) { this.PC = (this.PC + ((r << 24) >> 24)) & 0xFFFF; this.cycles += 2; } }
+  asl(v) { this.setC(v & 0x80); v = (v << 1) & 0xFF; this.nz(v); return v; }
+  lsr(v) { this.setC(v & 1); v >>= 1; this.nz(v); return v; }
+  rol(v) { const c = this.PSW & 1; this.setC(v & 0x80); v = ((v << 1) | c) & 0xFF; this.nz(v); return v; }
+  ror(v) { const c = this.PSW & 1; this.setC(v & 1); v = (v >> 1) | (c << 7); this.nz(v); return v; }
+  inc(v) { v = (v + 1) & 0xFF; this.nz(v); return v; }
+  dec(v) { v = (v - 1) & 0xFF; this.nz(v); return v; }
+  memBit() { const w = this.f16(); return [w & 0x1FFF, w >> 13]; }
+
+  run(target) {
+    while (this.cycles < target) {
+      const start = this.cycles;
+      if (this.halted) this.cycles += 2; else this.step();
+      const d = this.cycles - start;
+      this.tickTimers(d);
+      this.sampleCyc += d;
+      while (this.sampleCyc >= 32) { this.sampleCyc -= 32; this.dsp.sample(); }
+    }
+  }
+  tickTimers(d) {
+    for (let i = 0; i < 3; i++) {
+      this.tStage[i] += d;
+      const div = i < 2 ? 128 : 16;
+      while (this.tStage[i] >= div) {
+        this.tStage[i] -= div;
+        if (!this.tEn[i]) continue;
+        this.tInner[i] = (this.tInner[i] + 1) & 0xFF;
+        if (this.tInner[i] === this.tTarget[i]) { this.tInner[i] = 0; this.tOut[i] = (this.tOut[i] + 1) & 15; }
+      }
+    }
+  }
+  step() {
+    const op = this.f8();
+    this.cycles += SPC_CYC[op];
+    const hi = op >> 4, lo = op & 15;
+    // ALU block (0x00-0xBF, low nibble 4-9)
+    if (op < 0xC0 && lo >= 4 && lo <= 9) {
+      const aop = hi >> 1, odd = hi & 1;
+      let b, addr;
+      switch (lo) {
+        case 4: b = this.rd(odd ? this.dp(this.f8() + this.X) : this.dp(this.f8())); break;
+        case 5: b = this.rd(odd ? (this.f16() + this.X) & 0xFFFF : this.f16()); break;
+        case 6: b = this.rd(odd ? (this.f16() + this.Y) & 0xFFFF : this.dp(this.X)); break;
+        case 7: {
+          if (odd) { const p = this.f8(); b = this.rd((this.rdDPW(p) + this.Y) & 0xFFFF); }
+          else { const p = this.f8() + this.X; b = this.rd(this.rdDPW(p)); }
+          break;
+        }
+        case 8: {
+          if (!odd) { b = this.f8(); break; }
+          const imm = this.f8(); addr = this.dp(this.f8());
+          const r = this.alu(aop, this.rd(addr), imm); if (r >= 0) this.wr(addr, r); return;
+        }
+        case 9: {
+          let src;
+          if (!odd) { src = this.rd(this.dp(this.f8())); addr = this.dp(this.f8()); }
+          else { src = this.rd(this.dp(this.Y)); addr = this.dp(this.X); }
+          const r = this.alu(aop, this.rd(addr), src); if (r >= 0) this.wr(addr, r); return;
+        }
+      }
+      const r = this.alu(aop, this.A, b); if (r >= 0) this.A = r;
+      return;
+    }
+    if (lo === 1) { this.push(this.PC >> 8); this.push(this.PC); this.PC = this.rdw(0xFFDE - hi * 2); return; }
+    if (lo === 2) { const a = this.dp(this.f8()); const bit = 1 << (hi >> 1); const v = this.rd(a); this.wr(a, (hi & 1) ? (v & ~bit) : (v | bit)); return; }
+    if (lo === 3) { const v = this.rd(this.dp(this.f8())); const bit = (v >> (hi >> 1)) & 1; this.branch((hi & 1) ? !bit : bit); return; }
+    let a, v, w;
+    switch (op) {
+      case 0x00: break;
+      case 0x10: this.branch(!(this.PSW & 0x80)); break;
+      case 0x30: this.branch(this.PSW & 0x80); break;
+      case 0x50: this.branch(!(this.PSW & 0x40)); break;
+      case 0x70: this.branch(this.PSW & 0x40); break;
+      case 0x90: this.branch(!(this.PSW & 1)); break;
+      case 0xB0: this.branch(this.PSW & 1); break;
+      case 0xD0: this.branch(!(this.PSW & 2)); break;
+      case 0xF0: this.branch(this.PSW & 2); break;
+      case 0x2F: this.branch(true); break;
+      case 0x20: this.PSW &= ~0x20; break;
+      case 0x40: this.PSW |= 0x20; break;
+      case 0x60: this.PSW &= ~1; break;
+      case 0x80: this.PSW |= 1; break;
+      case 0xA0: this.PSW |= 4; break;
+      case 0xC0: this.PSW &= ~4; break;
+      case 0xE0: this.PSW &= ~0x48; break;
+      case 0xED: this.PSW ^= 1; break;
+      // MOV group
+      case 0xC4: this.wr(this.dp(this.f8()), this.A); break;
+      case 0xD4: this.wr(this.dp(this.f8() + this.X), this.A); break;
+      case 0xC5: this.wr(this.f16(), this.A); break;
+      case 0xD5: this.wr((this.f16() + this.X) & 0xFFFF, this.A); break;
+      case 0xC6: this.wr(this.dp(this.X), this.A); break;
+      case 0xD6: this.wr((this.f16() + this.Y) & 0xFFFF, this.A); break;
+      case 0xC7: a = this.f8() + this.X; this.wr(this.rdDPW(a), this.A); break;
+      case 0xD7: a = this.f8(); this.wr((this.rdDPW(a) + this.Y) & 0xFFFF, this.A); break;
+      case 0xE4: this.A = this.rd(this.dp(this.f8())); this.nz(this.A); break;
+      case 0xF4: this.A = this.rd(this.dp(this.f8() + this.X)); this.nz(this.A); break;
+      case 0xE5: this.A = this.rd(this.f16()); this.nz(this.A); break;
+      case 0xF5: this.A = this.rd((this.f16() + this.X) & 0xFFFF); this.nz(this.A); break;
+      case 0xE6: this.A = this.rd(this.dp(this.X)); this.nz(this.A); break;
+      case 0xF6: this.A = this.rd((this.f16() + this.Y) & 0xFFFF); this.nz(this.A); break;
+      case 0xE7: a = this.f8() + this.X; this.A = this.rd(this.rdDPW(a)); this.nz(this.A); break;
+      case 0xF7: a = this.f8(); this.A = this.rd((this.rdDPW(a) + this.Y) & 0xFFFF); this.nz(this.A); break;
+      case 0xE8: this.A = this.f8(); this.nz(this.A); break;
+      case 0xCD: this.X = this.f8(); this.nz(this.X); break;
+      case 0x8D: this.Y = this.f8(); this.nz(this.Y); break;
+      case 0xC8: this.cmp(this.X, this.f8()); break;
+      case 0xAD: this.cmp(this.Y, this.f8()); break;
+      case 0xD8: this.wr(this.dp(this.f8()), this.X); break;
+      case 0xD9: this.wr(this.dp(this.f8() + this.Y), this.X); break;
+      case 0xC9: this.wr(this.f16(), this.X); break;
+      case 0xF8: this.X = this.rd(this.dp(this.f8())); this.nz(this.X); break;
+      case 0xF9: this.X = this.rd(this.dp(this.f8() + this.Y)); this.nz(this.X); break;
+      case 0xE9: this.X = this.rd(this.f16()); this.nz(this.X); break;
+      case 0xCB: this.wr(this.dp(this.f8()), this.Y); break;
+      case 0xDB: this.wr(this.dp(this.f8() + this.X), this.Y); break;
+      case 0xCC: this.wr(this.f16(), this.Y); break;
+      case 0xEB: this.Y = this.rd(this.dp(this.f8())); this.nz(this.Y); break;
+      case 0xFB: this.Y = this.rd(this.dp(this.f8() + this.X)); this.nz(this.Y); break;
+      case 0xEC: this.Y = this.rd(this.f16()); this.nz(this.Y); break;
+      case 0x1E: this.cmp(this.X, this.rd(this.f16())); break;
+      case 0x3E: this.cmp(this.X, this.rd(this.dp(this.f8()))); break;
+      case 0x5E: this.cmp(this.Y, this.rd(this.f16())); break;
+      case 0x7E: this.cmp(this.Y, this.rd(this.dp(this.f8()))); break;
+      case 0x8F: v = this.f8(); this.wr(this.dp(this.f8()), v); break;
+      case 0xFA: v = this.rd(this.dp(this.f8())); this.wr(this.dp(this.f8()), v); break;
+      case 0xAF: this.wr(this.dp(this.X), this.A); this.X = (this.X + 1) & 0xFF; break;
+      case 0xBF: this.A = this.rd(this.dp(this.X)); this.X = (this.X + 1) & 0xFF; this.nz(this.A); break;
+      case 0x5D: this.X = this.A; this.nz(this.X); break;
+      case 0x7D: this.A = this.X; this.nz(this.A); break;
+      case 0xDD: this.A = this.Y; this.nz(this.A); break;
+      case 0xFD: this.Y = this.A; this.nz(this.Y); break;
+      case 0x9D: this.X = this.SP; this.nz(this.X); break;
+      case 0xBD: this.SP = this.X; break;
+      // RMW
+      case 0x0B: a = this.dp(this.f8()); this.wr(a, this.asl(this.rd(a))); break;
+      case 0x1B: a = this.dp(this.f8() + this.X); this.wr(a, this.asl(this.rd(a))); break;
+      case 0x0C: a = this.f16(); this.wr(a, this.asl(this.rd(a))); break;
+      case 0x1C: this.A = this.asl(this.A); break;
+      case 0x2B: a = this.dp(this.f8()); this.wr(a, this.rol(this.rd(a))); break;
+      case 0x3B: a = this.dp(this.f8() + this.X); this.wr(a, this.rol(this.rd(a))); break;
+      case 0x2C: a = this.f16(); this.wr(a, this.rol(this.rd(a))); break;
+      case 0x3C: this.A = this.rol(this.A); break;
+      case 0x4B: a = this.dp(this.f8()); this.wr(a, this.lsr(this.rd(a))); break;
+      case 0x5B: a = this.dp(this.f8() + this.X); this.wr(a, this.lsr(this.rd(a))); break;
+      case 0x4C: a = this.f16(); this.wr(a, this.lsr(this.rd(a))); break;
+      case 0x5C: this.A = this.lsr(this.A); break;
+      case 0x6B: a = this.dp(this.f8()); this.wr(a, this.ror(this.rd(a))); break;
+      case 0x7B: a = this.dp(this.f8() + this.X); this.wr(a, this.ror(this.rd(a))); break;
+      case 0x6C: a = this.f16(); this.wr(a, this.ror(this.rd(a))); break;
+      case 0x7C: this.A = this.ror(this.A); break;
+      case 0x8B: a = this.dp(this.f8()); this.wr(a, this.dec(this.rd(a))); break;
+      case 0x9B: a = this.dp(this.f8() + this.X); this.wr(a, this.dec(this.rd(a))); break;
+      case 0x8C: a = this.f16(); this.wr(a, this.dec(this.rd(a))); break;
+      case 0x9C: this.A = this.dec(this.A); break;
+      case 0x1D: this.X = this.dec(this.X); break;
+      case 0xDC: this.Y = this.dec(this.Y); break;
+      case 0xAB: a = this.dp(this.f8()); this.wr(a, this.inc(this.rd(a))); break;
+      case 0xBB: a = this.dp(this.f8() + this.X); this.wr(a, this.inc(this.rd(a))); break;
+      case 0xAC: a = this.f16(); this.wr(a, this.inc(this.rd(a))); break;
+      case 0xBC: this.A = this.inc(this.A); break;
+      case 0x3D: this.X = this.inc(this.X); break;
+      case 0xFC: this.Y = this.inc(this.Y); break;
+      // 16-bit
+      case 0x1A: a = this.f8(); w = (this.rdDPW(a) - 1) & 0xFFFF; this.wr(this.dp(a), w & 0xFF); this.wr(this.dp(a + 1), w >> 8); this.nz16(w); break;
+      case 0x3A: a = this.f8(); w = (this.rdDPW(a) + 1) & 0xFFFF; this.wr(this.dp(a), w & 0xFF); this.wr(this.dp(a + 1), w >> 8); this.nz16(w); break;
+      case 0x5A: { w = this.rdDPW(this.f8()); const r = this.YA - w; this.setC(r >= 0); this.nz16(r & 0xFFFF); break; }
+      case 0x7A: {
+        w = this.rdDPW(this.f8()); const ya = this.YA; const r = ya + w;
+        this.PSW = (this.PSW & ~0x49) | (r > 0xFFFF ? 1 : 0) | ((~(ya ^ w) & (ya ^ r) & 0x8000) ? 0x40 : 0) | ((((ya & 0xFFF) + (w & 0xFFF)) > 0xFFF) ? 8 : 0);
+        this.setYA(r & 0xFFFF); this.nz16(r); break;
+      }
+      case 0x9A: {
+        w = this.rdDPW(this.f8()); const ya = this.YA; const r = ya - w;
+        this.PSW = (this.PSW & ~0x49) | (r >= 0 ? 1 : 0) | (((ya ^ w) & (ya ^ r) & 0x8000) ? 0x40 : 0) | ((((ya & 0xFFF) - (w & 0xFFF)) >= 0) ? 8 : 0);
+        this.setYA(r & 0xFFFF); this.nz16(r & 0xFFFF); break;
+      }
+      case 0xBA: w = this.rdDPW(this.f8()); this.setYA(w); this.nz16(w); break;
+      case 0xDA: a = this.f8(); this.wr(this.dp(a), this.A); this.wr(this.dp(a + 1), this.Y); break;
+      case 0xCF: w = this.Y * this.A; this.setYA(w); this.nz(this.Y); break;
+      case 0x9E: {
+        const ya = this.YA, x = this.X;
+        this.PSW = (this.PSW & ~0x48) | (this.Y >= x ? 0x40 : 0) | ((this.Y & 15) >= (x & 15) ? 8 : 0);
+        if (this.Y < (x << 1)) { this.A = Math.floor(ya / x) & 0xFF; this.Y = (ya % x) & 0xFF; }
+        else { this.A = (255 - Math.floor((ya - (x << 9)) / (256 - x))) & 0xFF; this.Y = (x + ((ya - (x << 9)) % (256 - x))) & 0xFF; }
+        this.nz(this.A); break;
+      }
+      case 0xDF:
+        if ((this.PSW & 1) || this.A > 0x99) { this.A = (this.A + 0x60) & 0xFF; this.PSW |= 1; }
+        if ((this.PSW & 8) || (this.A & 15) > 9) this.A = (this.A + 6) & 0xFF;
+        this.nz(this.A); break;
+      case 0xBE:
+        if (!(this.PSW & 1) || this.A > 0x99) { this.A = (this.A - 0x60) & 0xFF; this.PSW &= ~1; }
+        if (!(this.PSW & 8) || (this.A & 15) > 9) this.A = (this.A - 6) & 0xFF;
+        this.nz(this.A); break;
+      case 0x9F: this.A = ((this.A >> 4) | (this.A << 4)) & 0xFF; this.nz(this.A); break;
+      // bit ops
+      case 0x0A: { const [ad, b] = this.memBit(); if ((this.rd(ad) >> b) & 1) this.PSW |= 1; break; }
+      case 0x2A: { const [ad, b] = this.memBit(); if (!((this.rd(ad) >> b) & 1)) this.PSW |= 1; break; }
+      case 0x4A: { const [ad, b] = this.memBit(); if (!((this.rd(ad) >> b) & 1)) this.PSW &= ~1; break; }
+      case 0x6A: { const [ad, b] = this.memBit(); if ((this.rd(ad) >> b) & 1) this.PSW &= ~1; break; }
+      case 0x8A: { const [ad, b] = this.memBit(); if ((this.rd(ad) >> b) & 1) this.PSW ^= 1; break; }
+      case 0xAA: { const [ad, b] = this.memBit(); this.setC((this.rd(ad) >> b) & 1); break; }
+      case 0xCA: { const [ad, b] = this.memBit(); v = this.rd(ad); v = (this.PSW & 1) ? (v | (1 << b)) : (v & ~(1 << b)); this.wr(ad, v); break; }
+      case 0xEA: { const [ad, b] = this.memBit(); this.wr(ad, this.rd(ad) ^ (1 << b)); break; }
+      case 0x0E: a = this.f16(); v = this.rd(a); this.nz((this.A - v) & 0xFF); this.wr(a, v | this.A); break;
+      case 0x4E: a = this.f16(); v = this.rd(a); this.nz((this.A - v) & 0xFF); this.wr(a, v & ~this.A); break;
+      // control
+      case 0x2E: v = this.rd(this.dp(this.f8())); this.branch(this.A !== v); break;
+      case 0xDE: v = this.rd(this.dp(this.f8() + this.X)); this.branch(this.A !== v); break;
+      case 0x6E: a = this.dp(this.f8()); v = (this.rd(a) - 1) & 0xFF; this.wr(a, v); this.branch(v !== 0); break;
+      case 0xFE: this.Y = (this.Y - 1) & 0xFF; this.branch(this.Y !== 0); break;
+      case 0x5F: this.PC = this.f16(); break;
+      case 0x1F: a = (this.f16() + this.X) & 0xFFFF; this.PC = this.rdw(a); break;
+      case 0x3F: a = this.f16(); this.push(this.PC >> 8); this.push(this.PC); this.PC = a; break;
+      case 0x4F: a = this.f8(); this.push(this.PC >> 8); this.push(this.PC); this.PC = 0xFF00 | a; break;
+      case 0x6F: { const l = this.pop(); this.PC = l | (this.pop() << 8); break; }
+      case 0x7F: { this.PSW = this.pop(); const l = this.pop(); this.PC = l | (this.pop() << 8); break; }
+      case 0x0F: this.push(this.PC >> 8); this.push(this.PC); this.push(this.PSW); this.PSW = (this.PSW | 0x10) & ~4; this.PC = this.rdw(0xFFDE); break;
+      case 0x0D: this.push(this.PSW); break;
+      case 0x2D: this.push(this.A); break;
+      case 0x4D: this.push(this.X); break;
+      case 0x6D: this.push(this.Y); break;
+      case 0x8E: this.PSW = this.pop(); break;
+      case 0xAE: this.A = this.pop(); break;
+      case 0xCE: this.X = this.pop(); break;
+      case 0xEE: this.Y = this.pop(); break;
+      case 0xEF: case 0xFF: this.halted = true; break;
+      default: break;
+    }
+  }
+}
+
+class DSP {
+  constructor(apu) {
+    this.apu = apu; this.regs = new Uint8Array(128);
+    this.bufSize = 16384; this.outL = new Float32Array(this.bufSize); this.outR = new Float32Array(this.bufSize);
+    this.wpos = 0; this.rpos = 0;
+    this.voices = [];
+    for (let i = 0; i < 8; i++) this.voices.push({ addr: 0, counter: 0, buf: new Int16Array(16), last: 0, p1: 0, p2: 0, hdr: 0, state: 3, env: 0, envCnt: 0, out: 0 });
+    this.firL = new Int32Array(8); this.firR = new Int32Array(8);
+    this.reset();
+  }
+  reset() {
+    this.regs.fill(0); this.regs[0x6C] = 0xE0;
+    this.konPending = 0; this.noise = 0x4000; this.noiseCnt = 0; this.echoPos = 0; this.firPos = 0;
+    for (const v of this.voices) { v.state = 3; v.env = 0; v.out = 0; }
+  }
+  read(a) { return this.regs[a]; }
+  write(a, v) {
+    if (a === 0x7C) { this.regs[a] = 0; return; }
+    this.regs[a] = v;
+    if (a === 0x4C) this.konPending |= v;
+  }
+  decode(v) {
+    const ram = this.apu.ram;
+    v.last = v.buf[15];
+    const hdr = ram[v.addr]; v.hdr = hdr;
+    const shift = hdr >> 4, filter = (hdr >> 2) & 3;
+    let p1 = v.p1, p2 = v.p2;
+    for (let i = 0; i < 16; i++) {
+      const byte = ram[(v.addr + 1 + (i >> 1)) & 0xFFFF];
+      let s = (i & 1) ? (byte & 15) : (byte >> 4);
+      if (s >= 8) s -= 16;
+      if (shift <= 12) s = (s << shift) >> 1; else s = s < 0 ? -2048 : 0;
+      const p2h = p2 >> 1;
+      if (filter === 1) s += (p1 >> 1) + ((-p1) >> 5);
+      else if (filter === 2) s += p1 - p2h + (p2h >> 4) + ((p1 * -3) >> 6);
+      else if (filter === 3) s += p1 - p2h + ((p1 * -13) >> 7) + ((p2h * 3) >> 4);
+      if (s > 32767) s = 32767; else if (s < -32768) s = -32768;
+      s = ((s << 1) << 16) >> 16;
+      v.buf[i] = s; p2 = p1; p1 = s;
+    }
+    v.p1 = p1; v.p2 = p2;
+  }
+  keyOn(i) {
+    const v = this.voices[i], r = this.regs, ram = this.apu.ram;
+    const dir = (r[0x5D] << 8) + r[(i << 4) + 4] * 4;
+    v.addr = ram[dir & 0xFFFF] | (ram[(dir + 1) & 0xFFFF] << 8);
+    v.counter = 0; v.env = 0; v.envCnt = 0; v.state = 0; v.p1 = 0; v.p2 = 0; v.buf.fill(0);
+    this.decode(v);
+    r[0x7C] &= ~(1 << i);
+  }
+  sample() {
+    const r = this.regs, ram = this.apu.ram;
+    const flg = r[0x6C];
+    if (this.konPending) {
+      for (let i = 0; i < 8; i++) if (this.konPending & (1 << i)) this.keyOn(i);
+      this.konPending = 0;
+    }
+    // noise
+    const nr = RATE_TABLE[flg & 31];
+    if (nr && ++this.noiseCnt >= nr) {
+      this.noiseCnt = 0;
+      const n = this.noise; this.noise = (n >> 1) | (((n << 14) ^ (n << 13)) & 0x4000);
+    }
+    let L = 0, R = 0, eL = 0, eR = 0;
+    const koff = r[0x5C], pmon = r[0x2D], non = r[0x3D], eon = r[0x4D];
+    let prevOut = 0;
+    for (let i = 0; i < 8; i++) {
+      const v = this.voices[i], b = i << 4;
+      if ((koff >> i) & 1 || (flg & 0x80)) { if (v.state !== 3) v.state = 3; if (flg & 0x80) v.env = 0; }
+      if (v.state === 3 && v.env === 0) { v.out = 0; r[b + 8] = 0; r[b + 9] = 0; prevOut = 0; continue; }
+      let pitch = (r[b + 2] | (r[b + 3] << 8)) & 0x3FFF;
+      if (i > 0 && ((pmon >> i) & 1)) { pitch += ((prevOut >> 5) * pitch) >> 10; if (pitch < 0) pitch = 0; if (pitch > 0x3FFF) pitch = 0x3FFF; }
+      let s;
+      if ((non >> i) & 1) s = ((this.noise << 17) >> 16);
+      else {
+        const idx = v.counter >> 12, frac = v.counter & 0xFFF;
+        const s0 = idx === 0 ? v.last : v.buf[idx - 1], s1 = v.buf[idx];
+        s = s0 + (((s1 - s0) * frac) >> 12);
+      }
+      // envelope
+      this.envelope(v, b);
+      const out = (s * v.env) >> 11;
+      v.out = out; prevOut = out;
+      r[b + 8] = v.env >> 4; r[b + 9] = (out >> 8) & 0xFF;
+      const vl = (r[b] << 24) >> 24, vr = (r[b + 1] << 24) >> 24;
+      const ol = (out * vl) >> 7, or = (out * vr) >> 7;
+      L += ol; R += or;
+      if ((eon >> i) & 1) { eL += ol; eR += or; }
+      v.counter += pitch;
+      while (v.counter >= 0x10000) {
+        v.counter -= 0x10000;
+        if (v.hdr & 1) {
+          r[0x7C] |= 1 << i;
+          if (v.hdr & 2) { const dir = (r[0x5D] << 8) + r[b + 4] * 4; v.addr = ram[(dir + 2) & 0xFFFF] | (ram[(dir + 3) & 0xFFFF] << 8); }
+          else { v.state = 3; v.env = 0; }
+        } else v.addr = (v.addr + 9) & 0xFFFF;
+        this.decode(v);
+      }
+    }
+    // echo
+    const esa = r[0x6D] << 8;
+    const edl = (r[0x7D] & 15) * 2048 || 4;
+    const ea = (esa + this.echoPos) & 0xFFFF;
+    const inL = ((ram[ea] | (ram[(ea + 1) & 0xFFFF] << 8)) << 16) >> 17;
+    const inR = ((ram[(ea + 2) & 0xFFFF] | (ram[(ea + 3) & 0xFFFF] << 8)) << 16) >> 17;
+    this.firPos = (this.firPos + 1) & 7;
+    this.firL[this.firPos] = inL; this.firR[this.firPos] = inR;
+    let fl = 0, fr = 0;
+    for (let k = 0; k < 8; k++) {
+      const c = (r[(k << 4) | 0x0F] << 24) >> 24;
+      const p = (this.firPos + 1 + k) & 7;
+      fl += (this.firL[p] * c) >> 6; fr += (this.firR[p] * c) >> 6;
+    }
+    fl = clamp16(fl); fr = clamp16(fr);
+    const mvl = (r[0x0C] << 24) >> 24, mvr = (r[0x1C] << 24) >> 24, evl = (r[0x2C] << 24) >> 24, evr = (r[0x3C] << 24) >> 24;
+    let outL = clamp16(((clamp16(L) * mvl) >> 7) + ((fl * evl) >> 7));
+    let outR = clamp16(((clamp16(R) * mvr) >> 7) + ((fr * evr) >> 7));
+    if (!(flg & 0x20)) {
+      const efb = (r[0x0D] << 24) >> 24;
+      const wl = clamp16(clamp16(eL) + ((fl * efb) >> 7)) & ~1, wr = clamp16(clamp16(eR) + ((fr * efb) >> 7)) & ~1;
+      ram[ea] = wl & 0xFF; ram[(ea + 1) & 0xFFFF] = (wl >> 8) & 0xFF;
+      ram[(ea + 2) & 0xFFFF] = wr & 0xFF; ram[(ea + 3) & 0xFFFF] = (wr >> 8) & 0xFF;
+    }
+    this.echoPos += 4; if (this.echoPos >= edl) this.echoPos = 0;
+    if (flg & 0x40) { outL = 0; outR = 0; }
+    const np = (this.wpos + 1) % this.bufSize;
+    if (np !== this.rpos) { this.outL[this.wpos] = outL / 32768; this.outR[this.wpos] = outR / 32768; this.wpos = np; }
+  }
+  envelope(v, b) {
+    const r = this.regs;
+    if (v.state === 3) { v.env -= 8; if (v.env < 0) v.env = 0; return; }
+    const a1 = r[b + 5], a2 = r[b + 6];
+    let rate, step = 0;
+    if (a1 & 0x80) {
+      if (v.state === 0) { rate = (a1 & 15) * 2 + 1; step = 1; }
+      else if (v.state === 1) { rate = ((a1 >> 4) & 7) * 2 + 16; step = 2; }
+      else { rate = a2 & 31; step = 2; }
+    } else {
+      const g = r[b + 7];
+      if (!(g & 0x80)) { v.env = (g & 0x7F) << 4; return; }
+      rate = g & 31; step = 3 + ((g >> 5) & 3);
+    }
+    const period = RATE_TABLE[rate];
+    if (!period) return;
+    if (++v.envCnt < period) return;
+    v.envCnt = 0;
+    let e = v.env;
+    switch (step) {
+      case 1: e += rate === 31 ? 1024 : 32; if (e >= 0x7FF) { e = 0x7FF; v.state = 1; } break;
+      case 2: e -= ((e - 1) >> 8) + 1; if (v.state === 1 && (e >> 8) <= (a2 >> 5)) v.state = 2; break;
+      case 3: e -= 32; break;
+      case 4: e -= ((e - 1) >> 8) + 1; break;
+      case 5: e += 32; break;
+      case 6: e += e < 0x600 ? 32 : 8; break;
+    }
+    if (e < 0) e = 0; if (e > 0x7FF) e = 0x7FF;
+    v.env = e;
+  }
+}
+function clamp16(v) { return v > 32767 ? 32767 : v < -32768 ? -32768 : v; }
+// ===== SNES system / bus =====
+const DMA_PAT = [[0], [0, 1], [0, 0], [0, 0, 1, 1], [0, 1, 2, 3], [0, 1, 0, 1], [0, 0], [0, 0, 1, 1]];
+const MASTER_PER_LINE = 1364, LINES = 262;
+const APU_RATIO = 21477272 / 1024000;
+
+class SNES {
+  constructor() {
+    this.wram = new Uint8Array(0x20000);
+    this.ppu = new PPU(this);
+    this.apu = new APU();
+    this.cpu = new CPU(this);
+    this.dmaR = new Uint8Array(0x80);
+    this.hdmaDo = new Uint8Array(8); this.hdmaTerm = new Uint8Array(8);
+    this.pad = [0, 0];
+    this.rom = null; this.sram = new Uint8Array(0);
+    this.sramDirty = false;
+  }
+  loadROM(data) {
+    let d = data;
+    if ((d.length & 0x3FF) === 0x200) d = d.subarray(0x200);
+    this.rom = new Uint8Array(d);
+    const score = base => {
+      if (base + 0x40 > d.length) return -100;
+      let s = 0;
+      const chk = d[base + 0x1E] | (d[base + 0x1F] << 8), cmp = d[base + 0x1C] | (d[base + 0x1D] << 8);
+      if ((chk ^ cmp) === 0xFFFF) s += 8;
+      const map = d[base + 0x15];
+      if (base === 0x7FC0 && (map & 0x0F) === 0) s += 2;
+      if (base === 0xFFC0 && (map & 0x0F) === 1) s += 2;
+      const rv = d[base + 0x3C] | (d[base + 0x3D] << 8);
+      if (rv >= 0x8000) s += 4; else s -= 4;
+      for (let i = 0; i < 21; i++) { const c = d[base + i]; if (c < 0x20 || c > 0x7E) { s -= 1; break; } }
+      return s;
+    };
+    this.hirom = score(0xFFC0) > score(0x7FC0);
+    const hb = this.hirom ? 0xFFC0 : 0x7FC0;
+    this.title = String.fromCharCode(...d.subarray(hb, hb + 21)).replace(/[^\x20-\x7E]/g, '').trim() || 'GAME';
+    const ss = d[hb + 0x18];
+    this.sram = new Uint8Array(ss > 0 && ss < 12 ? (1024 << ss) : 0);
+    this.sram.fill(0xFF);
+    this.romMask = this.rom.length;
+    this.reset();
+  }
+  reset() {
+    this.wram.fill(0x55); this.ppu.reset(); this.apu.reset(); this.dmaR.fill(0xFF);
+    this.nmitimen = 0; this.htime = 0x1FF; this.vtime = 0x1FF; this.memsel = 0; this.hdmaen = 0;
+    this.wrmpya = 0xFF; this.wrdiv = 0xFFFF; this.rddiv = 0; this.rdmpy = 0;
+    this.nmiFlag = false; this.irqFlag = false; this.autoJoy = [0, 0];
+    this.joyLatch = 0; this.joyShift = [0, 0]; this.wmAddr = 0; this.mdr = 0;
+    this.cyc = 0; this.line = 0; this.frameMaster = 0; this.irqTarget = -1;
+    this.cpu.reset();
+  }
+  romRead(bank, off) {
+    let i = this.hirom ? (((bank & 0x3F) << 16) | off) : (((bank & 0x7F) << 15) | (off & 0x7FFF));
+    if (i >= this.romMask) i %= this.romMask;
+    return this.rom[i];
+  }
+  sramIndex(bank, off) {
+    if (!this.sram.length) return -1;
+    if (this.hirom) {
+      const b = bank & 0x7F;
+      if (b >= 0x20 && b < 0x40 && off >= 0x6000 && off < 0x8000) return (((b & 0x1F) << 13) | (off - 0x6000)) % this.sram.length;
+    } else {
+      const b = bank & 0x7F;
+      if (b >= 0x70 && b < 0x7E && off < 0x8000) return (((b & 0xF) << 15) | off) % this.sram.length;
+    }
+    return -1;
+  }
+  syncAPU() {
+    const t = (this.frameMaster + this.cyc) / APU_RATIO;
+    if (this.apu.cycles < t) this.apu.run(t);
+  }
+  read(a) {
+    const bank = a >>> 16, off = a & 0xFFFF;
+    if (bank === 0x7E || bank === 0x7F) { this.cyc += 8; return this.mdr = this.wram[a - 0x7E0000]; }
+    if ((bank & 0x40) === 0) {
+      if (off < 0x2000) { this.cyc += 8; return this.mdr = this.wram[off]; }
+      if (off >= 0x8000) { this.cyc += ((bank & 0x80) && (this.memsel & 1)) ? 6 : 8; return this.mdr = this.romRead(bank, off); }
+      if (off < 0x4000) { this.cyc += 6; return this.mdr = this.readB(off & 0xFF); }
+      if (off < 0x4200) {
+        this.cyc += 12;
+        if (off === 0x4016) { const v = (this.joyShift[0] >> 15) & 1; this.joyShift[0] = ((this.joyShift[0] << 1) | 1) & 0xFFFF; return this.mdr = (this.mdr & 0xFC) | v; }
+        if (off === 0x4017) { const v = (this.joyShift[1] >> 15) & 1; this.joyShift[1] = ((this.joyShift[1] << 1) | 1) & 0xFFFF; return this.mdr = (this.mdr & 0xE0) | 0x1C | v; }
+        return this.mdr;
+      }
+      if (off < 0x6000) { this.cyc += 6; return this.mdr = this.readIO(off); }
+      this.cyc += 8;
+      const si = this.sramIndex(bank, off);
+      return si >= 0 ? (this.mdr = this.sram[si]) : this.mdr;
+    }
+    this.cyc += ((bank & 0x80) && (this.memsel & 1)) ? 6 : 8;
+    const si = this.sramIndex(bank, off);
+    if (si >= 0) return this.mdr = this.sram[si];
+    return this.mdr = this.romRead(bank, off);
+  }
+  write(a, v) {
+    const bank = a >>> 16, off = a & 0xFFFF;
+    this.mdr = v;
+    if (bank === 0x7E || bank === 0x7F) { this.cyc += 8; this.wram[a - 0x7E0000] = v; return; }
+    if ((bank & 0x40) === 0) {
+      if (off < 0x2000) { this.cyc += 8; this.wram[off] = v; return; }
+      if (off >= 0x8000) { this.cyc += 8; return; }
+      if (off < 0x4000) { this.cyc += 6; this.writeB(off & 0xFF, v); return; }
+      if (off < 0x4200) {
+        this.cyc += 12;
+        if (off === 0x4016) { const l = v & 1; if (l) { this.joyShift[0] = this.pad[0]; this.joyShift[1] = this.pad[1]; } this.joyLatch = l; }
+        return;
+      }
+      if (off < 0x6000) { this.cyc += 6; this.writeIO(off, v); return; }
+      this.cyc += 8;
+    } else this.cyc += 8;
+    const si = this.sramIndex(bank, off);
+    if (si >= 0 && this.sram[si] !== v) { this.sram[si] = v; this.sramDirty = true; }
+  }
+  readB(r) {
+    if (r >= 0x34 && r <= 0x3F) return this.ppu.read(r, this.mdr);
+    if (r >= 0x40 && r < 0x80) { this.syncAPU(); return this.apu.portOut[r & 3]; }
+    if (r === 0x80) { const v = this.wram[this.wmAddr]; this.wmAddr = (this.wmAddr + 1) & 0x1FFFF; return v; }
+    return this.mdr;
+  }
+  writeB(r, v) {
+    if (r <= 0x33) { this.ppu.write(r, v); return; }
+    if (r >= 0x40 && r < 0x80) { this.syncAPU(); this.apu.portIn[r & 3] = v; return; }
+    switch (r) {
+      case 0x80: this.wram[this.wmAddr] = v; this.wmAddr = (this.wmAddr + 1) & 0x1FFFF; break;
+      case 0x81: this.wmAddr = (this.wmAddr & 0x1FF00) | v; break;
+      case 0x82: this.wmAddr = (this.wmAddr & 0x100FF) | (v << 8); break;
+      case 0x83: this.wmAddr = (this.wmAddr & 0xFFFF) | ((v & 1) << 16); break;
+    }
+  }
+  readIO(off) {
+    if (off >= 0x4300 && off < 0x4380) return this.dmaR[off - 0x4300];
+    switch (off) {
+      case 0x4210: { const v = (this.nmiFlag ? 0x80 : 0) | 0x02 | (this.mdr & 0x70); this.nmiFlag = false; return v; }
+      case 0x4211: { const v = (this.irqFlag ? 0x80 : 0) | (this.mdr & 0x7F); this.irqFlag = false; this.cpu.irqLine = false; return v; }
+      case 0x4212: {
+        let v = (this.mdr & 0x3E);
+        if (this.line >= 225) v |= 0x80;
+        if (this.cyc >= 1096 || this.cyc < 88) v |= 0x40;
+        if ((this.nmitimen & 1) && this.line >= 225 && this.line <= 227) v |= 1;
+        return v;
+      }
+      case 0x4213: return 0xFF;
+      case 0x4214: return this.rddiv & 0xFF;
+      case 0x4215: return this.rddiv >> 8;
+      case 0x4216: return this.rdmpy & 0xFF;
+      case 0x4217: return this.rdmpy >> 8;
+      case 0x4218: return this.autoJoy[0] & 0xFF;
+      case 0x4219: return this.autoJoy[0] >> 8;
+      case 0x421A: return this.autoJoy[1] & 0xFF;
+      case 0x421B: return this.autoJoy[1] >> 8;
+      case 0x421C: case 0x421D: case 0x421E: case 0x421F: return 0;
+    }
+    return this.mdr;
+  }
+  writeIO(off, v) {
+    if (off >= 0x4300 && off < 0x4380) { this.dmaR[off - 0x4300] = v; return; }
+    switch (off) {
+      case 0x4200: {
+        const old = this.nmitimen; this.nmitimen = v;
+        if (!(old & 0x80) && (v & 0x80) && this.nmiFlag) this.cpu.nmiPending = true;
+        if (!(v & 0x30)) { this.irqFlag = false; this.cpu.irqLine = false; }
+        this.calcIrq();
+        break;
+      }
+      case 0x4202: this.wrmpya = v; break;
+      case 0x4203: this.rdmpy = this.wrmpya * v; this.rddiv = v; break;
+      case 0x4204: this.wrdiv = (this.wrdiv & 0xFF00) | v; break;
+      case 0x4205: this.wrdiv = (this.wrdiv & 0xFF) | (v << 8); break;
+      case 0x4206:
+        if (v === 0) { this.rddiv = 0xFFFF; this.rdmpy = this.wrdiv; }
+        else { this.rddiv = Math.floor(this.wrdiv / v); this.rdmpy = this.wrdiv % v; }
+        break;
+      case 0x4207: this.htime = (this.htime & 0x100) | v; this.calcIrq(); break;
+      case 0x4208: this.htime = (this.htime & 0xFF) | ((v & 1) << 8); this.calcIrq(); break;
+      case 0x4209: this.vtime = (this.vtime & 0x100) | v; this.calcIrq(); break;
+      case 0x420A: this.vtime = (this.vtime & 0xFF) | ((v & 1) << 8); this.calcIrq(); break;
+      case 0x420B: this.doDMA(v); break;
+      case 0x420C: this.hdmaen = v; break;
+      case 0x420D: this.memsel = v; break;
+    }
+  }
+  calcIrq(lineStart) {
+    const m = (this.nmitimen >> 4) & 3;
+    this.irqTarget = -1;
+    if (m === 0) return;
+    if ((m & 2) && this.line !== this.vtime) return;
+    const t = (m & 1) ? this.htime * 4 + 14 : 10;
+    if (lineStart || t > this.cyc) this.irqTarget = t;
+  }
+  doDMA(mask) {
+    for (let c = 0; c < 8; c++) {
+      if (!(mask & (1 << c))) continue;
+      const b = c << 4, r = this.dmaR;
+      const params = r[b], bAddr = r[b + 1];
+      let aAddr = r[b + 2] | (r[b + 3] << 8);
+      const aBank = r[b + 4] << 16;
+      let count = r[b + 5] | (r[b + 6] << 8); if (count === 0) count = 0x10000;
+      const pat = DMA_PAT[params & 7], plen = pat.length;
+      const dir = params & 0x80, fixed = params & 8, step = (params & 0x10) ? -1 : 1;
+      let i = 0;
+      this.cyc += 8;
+      while (count > 0) {
+        const br = (bAddr + pat[i % plen]) & 0xFF;
+        if (!dir) { const v = this.dmaReadA(aBank | aAddr); this.writeB(br, v); }
+        else { const v = this.readB(br); this.dmaWriteA(aBank | aAddr, v); }
+        if (!fixed) aAddr = (aAddr + step) & 0xFFFF;
+        count--; i++; this.cyc += 8;
+      }
+      r[b + 2] = aAddr & 0xFF; r[b + 3] = aAddr >> 8; r[b + 5] = 0; r[b + 6] = 0;
+    }
+  }
+  dmaReadA(a) { const c = this.cyc; const off = a & 0xFFFF; let v; if (!((a >>> 16) & 0x40) && off >= 0x2100 && off < 0x2200) v = this.mdr; else v = this.read(a); this.cyc = c; return v; }
+  dmaWriteA(a, v) { const c = this.cyc; const off = a & 0xFFFF; if (!(!((a >>> 16) & 0x40) && off >= 0x2100 && off < 0x2200)) this.write(a, v); this.cyc = c; }
+  hdmaInit() {
+    const r = this.dmaR;
+    for (let c = 0; c < 8; c++) {
+      this.hdmaDo[c] = 0; this.hdmaTerm[c] = 1;
+      if (!(this.hdmaen & (1 << c))) continue;
+      const b = c << 4;
+      r[b + 8] = r[b + 2]; r[b + 9] = r[b + 3];
+      this.hdmaTerm[c] = 0;
+      this.hdmaLoad(c);
+    }
+  }
+  hdmaLoad(c) {
+    const r = this.dmaR, b = c << 4;
+    let ta = r[b + 8] | (r[b + 9] << 8);
+    const bank = r[b + 4] << 16;
+    const n = this.dmaReadA(bank | ta); ta = (ta + 1) & 0xFFFF;
+    r[b + 10] = n;
+    if (r[b] & 0x40) {
+      const lo = this.dmaReadA(bank | ta); ta = (ta + 1) & 0xFFFF;
+      const hi = this.dmaReadA(bank | ta); ta = (ta + 1) & 0xFFFF;
+      r[b + 5] = lo; r[b + 6] = hi;
+    }
+    r[b + 8] = ta & 0xFF; r[b + 9] = ta >> 8;
+    if (n === 0) this.hdmaTerm[c] = 1;
+    this.hdmaDo[c] = 1;
+  }
+  hdmaRun() {
+    const r = this.dmaR;
+    for (let c = 0; c < 8; c++) {
+      if (!(this.hdmaen & (1 << c)) || this.hdmaTerm[c]) continue;
+      const b = c << 4;
+      if (this.hdmaDo[c]) {
+        const params = r[b], pat = DMA_PAT[params & 7], ind = params & 0x40;
+        let addr = ind ? (r[b + 5] | (r[b + 6] << 8)) : (r[b + 8] | (r[b + 9] << 8));
+        const bank = ind ? (r[b + 7] << 16) : (r[b + 4] << 16);
+        for (let i = 0; i < pat.length; i++) {
+          const br = (r[b + 1] + pat[i]) & 0xFF;
+          if (!(params & 0x80)) this.writeB(br, this.dmaReadA(bank | addr));
+          else this.dmaWriteA(bank | addr, this.readB(br));
+          addr = (addr + 1) & 0xFFFF;
+        }
+        this.cyc += 8 * pat.length;
+        if (ind) { r[b + 5] = addr & 0xFF; r[b + 6] = addr >> 8; } else { r[b + 8] = addr & 0xFF; r[b + 9] = addr >> 8; }
+      }
+      const n = (r[b + 10] - 1) & 0xFF;
+      r[b + 10] = n;
+      this.hdmaDo[c] = n & 0x80 ? 1 : 0;
+      if ((n & 0x7F) === 0) this.hdmaLoad(c);
+    }
+  }
+  runFrame() {
+    const cpu = this.cpu, ppu = this.ppu;
+    for (let line = 0; line < LINES; line++) {
+      this.line = line;
+      if (line === 0) {
+        this.nmiFlag = false;
+        if (this.hdmaen) this.hdmaInit();
+      }
+      if (line >= 1 && line <= 224) ppu.renderLine(line);
+      if (line === 225) {
+        if (!(ppu.inidisp & 0x80)) ppu.oamAddr = ppu.oamReload;
+        this.nmiFlag = true;
+        if (this.nmitimen & 0x80) cpu.nmiPending = true;
+        if (this.nmitimen & 1) { this.autoJoy[0] = this.pad[0]; this.autoJoy[1] = this.pad[1]; }
+      }
+      this.calcIrq(true);
+      let hdmaDone = line >= 224;
+      while (this.cyc < MASTER_PER_LINE) {
+        if (this.irqTarget >= 0 && this.cyc >= this.irqTarget) { this.irqFlag = true; cpu.irqLine = true; this.irqTarget = -1; }
+        if (!hdmaDone && this.cyc >= 1104) { hdmaDone = true; this.hdmaRun(); }
+        if (cpu.waiting && !cpu.nmiPending && !cpu.irqLine) {
+          let next = MASTER_PER_LINE;
+          if (this.irqTarget >= 0 && this.irqTarget < next) next = this.irqTarget;
+          if (!hdmaDone && next > 1104) next = 1104;
+          this.cyc = Math.max(this.cyc + 2, next);
+          continue;
+        }
+        cpu.step();
+      }
+      if (!hdmaDone) this.hdmaRun();
+      this.syncAPU();
+      this.cyc -= MASTER_PER_LINE;
+      this.frameMaster += MASTER_PER_LINE;
+    }
+    // rebase APU clock
+    const spcFrame = this.frameMaster / APU_RATIO;
+    this.apu.cycles -= spcFrame;
+    this.frameMaster = 0;
+  }
+}
+
+// ---------- save states ----------
+const STATE_SKIP = {
+  snes: ['rom', 'ppu', 'apu', 'cpu', 'pad', 'sramDirty'],
+  cpu: ['sys'],
+  ppu: ['sys', 'image', 'lut', 'lutBright', 'bgCol', 'bgPri', 'objCol', 'objPri', 'objMath', 'mainC', 'mainZ', 'mainL', 'subC', 'subZ', 'subL', 'winBuf', 'winOn', 'rowBuf'],
+  apu: ['dsp'],
+  dsp: ['apu', 'outL', 'outR', 'wpos', 'rpos', 'bufSize', 'voices'],
+};
+function snapObj(o, skip) {
+  const r = {};
+  for (const k of Object.keys(o)) {
+    if (skip.includes(k)) continue;
+    const v = o[k];
+    if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') r[k] = v;
+    else if (ArrayBuffer.isView(v)) r[k] = v.slice();
+    else if (Array.isArray(v) && v.every(x => typeof x === 'number')) r[k] = v.slice();
+  }
+  return r;
+}
+function restoreObj(o, r) {
+  for (const k in r) {
+    const v = r[k];
+    if (ArrayBuffer.isView(o[k]) && ArrayBuffer.isView(v) && o[k].length === v.length) o[k].set(v);
+    else if (ArrayBuffer.isView(o[k])) { o[k] = v.slice(); }
+    else if (Array.isArray(v)) o[k] = v.slice();
+    else o[k] = v;
+  }
+}
+SNES.prototype.saveState = function () {
+  return {
+    v: 1, title: this.title, romLen: this.rom.length,
+    snes: snapObj(this, STATE_SKIP.snes), cpu: snapObj(this.cpu, STATE_SKIP.cpu), ppu: snapObj(this.ppu, STATE_SKIP.ppu),
+    apu: snapObj(this.apu, STATE_SKIP.apu), dsp: snapObj(this.apu.dsp, STATE_SKIP.dsp),
+    voices: this.apu.dsp.voices.map(v => snapObj(v, [])),
+  };
+};
+SNES.prototype.loadState = function (st) {
+  if (!st || st.title !== this.title || st.romLen !== this.rom.length) throw new Error('このソフトのセーブデータではありません');
+  restoreObj(this, st.snes); restoreObj(this.cpu, st.cpu); restoreObj(this.ppu, st.ppu);
+  restoreObj(this.apu, st.apu); restoreObj(this.apu.dsp, st.dsp);
+  st.voices.forEach((v, i) => restoreObj(this.apu.dsp.voices[i], v));
+  this.ppu.lutBright = -1;
+  const d = this.apu.dsp; d.rpos = d.wpos;
+};
+// compact text encoding for storage
+function encodeState(st) {
+  const bins = [];
+  const json = JSON.stringify(st, (k, v) => {
+    if (ArrayBuffer.isView(v)) { bins.push(v); return { __t: v.constructor.name, i: bins.length - 1 }; }
+    return v;
+  });
+  const total = bins.reduce((a, b) => a + b.byteLength, 0);
+  const all = new Uint8Array(total); let o = 0; const offs = [];
+  bins.forEach(b => { offs.push(o); all.set(new Uint8Array(b.buffer, b.byteOffset, b.byteLength), o); o += b.byteLength; });
+  let bin = ''; for (let i = 0; i < all.length; i += 0x8000) bin += String.fromCharCode.apply(null, all.subarray(i, i + 0x8000));
+  return JSON.stringify({ j: json, offs, lens: bins.map(b => b.byteLength), b: btoa(bin) });
+}
+function decodeState(str) {
+  const w = JSON.parse(str);
+  const bin = atob(w.b); const all = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) all[i] = bin.charCodeAt(i);
+  const T = { Uint8Array, Uint16Array, Int16Array, Int32Array, Uint32Array, Float32Array, Int8Array };
+  return JSON.parse(w.j, (k, v) => {
+    if (v && v.__t !== undefined && T[v.__t]) {
+      const C = T[v.__t]; const bytes = all.slice(w.offs[v.i], w.offs[v.i] + w.lens[v.i]);
+      return new C(bytes.buffer);
+    }
+    return v;
+  });
+}
+if (typeof module !== 'undefined') module.exports = { SNES, encodeState, decodeState };
+
+// ===== 7z extractor (pure JS): Copy / LZMA / LZMA2 / BCJ(x86) / Deflate(via DecompressionStream) =====
+const SevenZ = (() => {
+  const CRC_T = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC_T[n] = c >>> 0; }
+  const crc32 = (b, s = 0, e = b.length) => { let c = 0xFFFFFFFF; for (let i = s; i < e; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+
+  // ---------- LZMA ----------
+  class Lzma {
+    constructor(out) { this.out = out; this.dictStart = 0; }
+    setProps(lc, lp, pb) { this.lc = lc; this.lp = lp; this.pb = pb; }
+    resetState() {
+      const nLit = 0x300 << (this.lc + this.lp);
+      const p = n => { const a = new Uint16Array(n); a.fill(1024); return a; };
+      this.lit = p(nLit); this.isMatch = p(192); this.isRep = p(12); this.isRepG0 = p(12); this.isRepG1 = p(12); this.isRepG2 = p(12);
+      this.isRep0Long = p(192); this.posSlot = p(256); this.specPos = p(115); this.align = p(16);
+      this.len = this.mkLen(p); this.repLen = this.mkLen(p);
+      this.state = 0; this.rep0 = this.rep1 = this.rep2 = this.rep3 = 0;
+    }
+    mkLen(p) { return { choice: p(2), low: p(128), mid: p(128), high: p(256) }; }
+    rcInit(buf, pos) {
+      this.b = buf; this.p = pos + 1; this.range = 0xFFFFFFFF; this.code = 0;
+      for (let i = 0; i < 4; i++) this.code = ((this.code << 8) | buf[this.p++]) >>> 0;
+    }
+    bit(pr, i) {
+      const v = pr[i], bound = (this.range >>> 11) * v;
+      let r;
+      if (this.code < bound) { this.range = bound; pr[i] = v + ((2048 - v) >> 5); r = 0; }
+      else { this.range -= bound; this.code -= bound; pr[i] = v - (v >> 5); r = 1; }
+      if (this.range < 0x1000000) { this.range = (this.range * 256) >>> 0; this.code = ((this.code * 256) + this.b[this.p++]) >>> 0; }
+      return r;
+    }
+    tree(pr, base, n) { let m = 1; for (let i = 0; i < n; i++) m = (m << 1) | this.bit(pr, base + m); return m - (1 << n); }
+    rtree(pr, base, n) { let m = 1, s = 0; for (let i = 0; i < n; i++) { const b = this.bit(pr, base + m); m = (m << 1) | b; s |= b << i; } return s; }
+    direct(n) {
+      let r = 0;
+      for (let i = 0; i < n; i++) {
+        this.range = this.range >>> 1;
+        let b = 0; if (this.code >= this.range) { this.code -= this.range; b = 1; }
+        r = r * 2 + b;
+        if (this.range < 0x1000000) { this.range = (this.range * 256) >>> 0; this.code = ((this.code * 256) + this.b[this.p++]) >>> 0; }
+      }
+      return r;
+    }
+    lenDec(L, ps) {
+      if (!this.bit(L.choice, 0)) return this.tree(L.low, ps << 3, 3);
+      if (!this.bit(L.choice, 1)) return 8 + this.tree(L.mid, ps << 3, 3);
+      return 16 + this.tree(L.high, 0, 8);
+    }
+    // decode until out position reaches end; returns false on end marker
+    decode(pos, end) {
+      const out = this.out, lc = this.lc, lpMask = (1 << this.lp) - 1, pbMask = (1 << this.pb) - 1;
+      let state = this.state;
+      while (pos < end) {
+        const ps = pos & pbMask;
+        if (!this.bit(this.isMatch, (state << 4) + ps)) {
+          const prev = pos > this.dictStart ? out[pos - 1] : 0;
+          const base = 0x300 * (((pos & lpMask) << lc) + (prev >> (8 - lc)));
+          let sym = 1;
+          if (state >= 7) {
+            let mb = out[pos - this.rep0 - 1];
+            do {
+              const mbit = (mb >> 7) & 1; mb <<= 1;
+              const b = this.bit(this.lit, base + ((1 + mbit) << 8) + sym);
+              sym = (sym << 1) | b;
+              if (mbit !== b) break;
+            } while (sym < 0x100);
+          }
+          while (sym < 0x100) sym = (sym << 1) | this.bit(this.lit, base + sym);
+          out[pos++] = sym & 0xFF;
+          state = state < 4 ? 0 : state < 10 ? state - 3 : state - 6;
+          continue;
+        }
+        let len;
+        if (this.bit(this.isRep, state)) {
+          if (pos === this.dictStart) throw new Error('7zデータが壊れています');
+          if (!this.bit(this.isRepG0, state)) {
+            if (!this.bit(this.isRep0Long, (state << 4) + ps)) {
+              state = state < 7 ? 9 : 11;
+              out[pos] = out[pos - this.rep0 - 1]; pos++;
+              continue;
+            }
+          } else {
+            let d;
+            if (!this.bit(this.isRepG1, state)) d = this.rep1;
+            else { if (!this.bit(this.isRepG2, state)) d = this.rep2; else { d = this.rep3; this.rep3 = this.rep2; } this.rep2 = this.rep1; }
+            this.rep1 = this.rep0; this.rep0 = d;
+          }
+          len = this.lenDec(this.repLen, ps);
+          state = state < 7 ? 8 : 11;
+        } else {
+          this.rep3 = this.rep2; this.rep2 = this.rep1; this.rep1 = this.rep0;
+          len = this.lenDec(this.len, ps);
+          state = state < 7 ? 7 : 10;
+          const ls = len < 3 ? len : 3;
+          const slot = this.tree(this.posSlot, ls << 6, 6);
+          let dist;
+          if (slot < 4) dist = slot;
+          else {
+            const nd = (slot >> 1) - 1;
+            dist = (2 | (slot & 1)) * Math.pow(2, nd);
+            if (slot < 14) dist += this.rtree(this.specPos, dist - slot, nd);
+            else dist += this.direct(nd - 4) * 16 + this.rtree(this.align, 0, 4);
+          }
+          if (dist === 0xFFFFFFFF) { this.state = state; return pos; }
+          this.rep0 = dist;
+        }
+        len += 2;
+        const src = pos - this.rep0 - 1;
+        if (src < this.dictStart) throw new Error('7zデータが壊れています');
+        for (let i = 0; i < len && pos < end; i++) { out[pos] = out[src + i]; pos++; }
+      }
+      this.state = state;
+      return pos;
+    }
+  }
+  function lzma1(input, props, size) {
+    const out = new Uint8Array(size);
+    let d = props[0]; const lc = d % 9; d = (d / 9) | 0; const lp = d % 5, pb = (d / 5) | 0;
+    const z = new Lzma(out); z.setProps(lc, lp, pb); z.resetState(); z.rcInit(input, 0);
+    z.decode(0, size);
+    return out;
+  }
+  function lzma2(input, size) {
+    const out = new Uint8Array(size);
+    const z = new Lzma(out);
+    let ip = 0, op = 0, needProps = true;
+    while (ip < input.length) {
+      const c = input[ip++];
+      if (c === 0) break;
+      if (c === 1 || c === 2) {
+        const n = ((input[ip] << 8) | input[ip + 1]) + 1; ip += 2;
+        if (c === 1) z.dictStart = op;
+        out.set(input.subarray(ip, ip + n), op); ip += n; op += n;
+        continue;
+      }
+      if (c < 0x80) throw new Error('7zデータが壊れています');
+      const usize = ((c & 0x1F) << 16) + (input[ip] << 8) + input[ip + 1] + 1;
+      const psize = (input[ip + 2] << 8) + input[ip + 3] + 1; ip += 4;
+      const mode = (c >> 5) & 3;
+      if (mode === 3) z.dictStart = op;
+      if (mode >= 2) { let d = input[ip++]; const lc = d % 9; d = (d / 9) | 0; z.setProps(lc, d % 5, (d / 5) | 0); needProps = false; }
+      if (needProps) throw new Error('7zデータが壊れています');
+      if (mode >= 1) z.resetState();
+      z.rcInit(input, ip);
+      op = z.decode(op, op + usize);
+      ip += psize;
+    }
+    return out;
+  }
+  function bcjX86(buf) {
+    const ALLOWED = [1, 1, 1, 0, 1, 0, 0, 0], BITNUM = [0, 1, 2, 2, 3, 3, 3, 3];
+    const t = b => b === 0 || b === 0xFF;
+    let prevMask = 0, prevPos = -5;
+    const limit = buf.length - 5;
+    let i = 0;
+    while (i <= limit) {
+      let b = buf[i];
+      if (b !== 0xE8 && b !== 0xE9) { i++; continue; }
+      const off = i - prevPos; prevPos = i;
+      if (off > 5) prevMask = 0; else for (let k = 0; k < off; k++) { prevMask &= 0x77; prevMask <<= 1; }
+      b = buf[i + 4];
+      if (t(b) && ALLOWED[(prevMask >> 1) & 7] && (prevMask >> 1) < 0x10) {
+        let src = ((b << 24) | (buf[i + 3] << 16) | (buf[i + 2] << 8) | buf[i + 1]) >>> 0, dest;
+        for (;;) {
+          dest = (src - (i + 5)) >>> 0;
+          if (prevMask === 0) break;
+          const k = BITNUM[prevMask >> 1];
+          b = (dest >>> (24 - k * 8)) & 0xFF;
+          if (!t(b)) break;
+          src = (dest ^ ((2 ** (32 - k * 8)) - 1)) >>> 0;
+        }
+        buf[i + 4] = ((dest >>> 24) & 1) ? 0xFF : 0; buf[i + 3] = (dest >>> 16) & 0xFF; buf[i + 2] = (dest >>> 8) & 0xFF; buf[i + 1] = dest & 0xFF;
+        i += 5; prevMask = 0;
+      } else { i++; prevMask |= 1; if (t(b)) prevMask |= 0x10; }
+    }
+    return buf;
+  }
+  async function inflateRaw(data) {
+    if (typeof DecompressionStream === 'undefined') throw new Error('この端末ではDeflate形式の7zを展開できません');
+    const ds = new DecompressionStream('deflate-raw');
+    const r = new Response(new Blob([data]).stream().pipeThrough(ds));
+    return new Uint8Array(await r.arrayBuffer());
+  }
+
+  // ---------- container ----------
+  const hex = a => Array.from(a, x => x.toString(16).padStart(2, '0')).join('');
+  async function runCoder(c, input, size) {
+    const id = hex(c.id);
+    switch (id) {
+      case '00': return input.subarray(0, size);
+      case '030101': return lzma1(input, c.props, size);
+      case '21': return lzma2(input, size);
+      case '03030103': return bcjX86(input.slice(0, size));
+      case '040108': return inflateRaw(input);
+      case '06f10701': throw new Error('パスワード付きの7zには対応していません');
+      case '040202': throw new Error('BZip2方式の7zには対応していません（LZMA/LZMA2で圧縮し直してください）');
+      case '0303011b': throw new Error('BCJ2方式の7zには対応していません');
+      default: throw new Error('未対応の圧縮方式です（' + id + '）');
+    }
+  }
+  async function decodeFolder(buf, f, packOffset) {
+    // pack streams in order
+    const packs = []; let off = packOffset;
+    for (let i = 0; i < f.packed.length; i++) { packs.push(buf.subarray(off, off + f.packSizes[i])); off += f.packSizes[i]; }
+    // index maps
+    const inBase = [], outBase = []; let ni = 0, no = 0;
+    f.coders.forEach(c => { inBase.push(ni); outBase.push(no); ni += c.nIn; no += c.nOut; });
+    const coderOfOut = o => f.coders.findIndex((c, k) => o >= outBase[k] && o < outBase[k] + c.nOut);
+    const decodeOut = async o => {
+      const k = coderOfOut(o), c = f.coders[k];
+      if (c.nIn !== 1 || c.nOut !== 1) throw new Error('未対応の7z構造です');
+      const inIdx = inBase[k];
+      let input;
+      const pi = f.packed.indexOf(inIdx);
+      if (pi >= 0) input = packs[pi];
+      else { const bp = f.bind.find(b => b.in === inIdx); input = await decodeOut(bp.out); }
+      return runCoder(c, input, f.unpack[o]);
+    };
+    let main = 0;
+    for (let o = 0; o < no; o++) if (!f.bind.some(b => b.out === o)) { main = o; break; }
+    const data = await decodeOut(main);
+    if (f.crc !== undefined && crc32(data) !== f.crc) throw new Error('7zの中身が壊れています（CRC不一致）');
+    return data;
+  }
+  function parser(b, p) {
+    const P = {
+      byte: () => b[p++],
+      num: () => {
+        const first = b[p++]; let mask = 0x80, v = 0;
+        for (let i = 0; i < 8; i++) {
+          if ((first & mask) === 0) return v + (first & (mask - 1)) * Math.pow(2, 8 * i);
+          v += b[p++] * Math.pow(2, 8 * i); mask >>= 1;
+        }
+        return v;
+      },
+      u32: () => { const v = (b[p] | (b[p + 1] << 8) | (b[p + 2] << 16) | (b[p + 3] << 24)) >>> 0; p += 4; return v; },
+      bits: n => { const r = []; let m = 0, v = 0; for (let i = 0; i < n; i++) { if (!m) { v = b[p++]; m = 0x80; } r.push((v & m) !== 0); m >>= 1; } return r; },
+      bytes: n => { const r = b.subarray(p, p + n); p += n; return r; },
+      skip: n => { p += n; },
+      get pos() { return p; }
+    };
+    P.digests = n => { const all = P.byte(); const def = all ? new Array(n).fill(true) : P.bits(n); return def.map(d => d ? P.u32() : undefined); };
+    return P;
+  }
+  function readStreams(P) {
+    const si = { packPos: 0, packSizes: [], folders: [], sub: null };
+    let t;
+    while ((t = P.byte()) !== 0) {
+      if (t === 6) {
+        si.packPos = P.num(); const n = P.num(); let u;
+        while ((u = P.byte()) !== 0) { if (u === 9) for (let i = 0; i < n; i++) si.packSizes.push(P.num()); else if (u === 10) P.digests(n); else throw new Error('7zヘッダを読めません'); }
+      } else if (t === 7) {
+        if (P.byte() !== 11) throw new Error('7zヘッダを読めません');
+        const nf = P.num(); if (P.byte() !== 0) throw new Error('未対応の7z構造です');
+        for (let i = 0; i < nf; i++) {
+          const f = { coders: [], bind: [], packed: [], unpack: [] };
+          const nc = P.num(); let tin = 0, tout = 0;
+          for (let k = 0; k < nc; k++) {
+            const fl = P.byte(); const id = P.bytes(fl & 15);
+            const c = { id, nIn: 1, nOut: 1, props: null };
+            if (fl & 0x10) { c.nIn = P.num(); c.nOut = P.num(); }
+            if (fl & 0x20) c.props = P.bytes(P.num());
+            if (fl & 0x80) throw new Error('未対応の7z構造です');
+            tin += c.nIn; tout += c.nOut; f.coders.push(c);
+          }
+          for (let k = 0; k < tout - 1; k++) f.bind.push({ in: P.num(), out: P.num() });
+          const np = tin - f.bind.length;
+          if (np === 1) { for (let k = 0; k < tin; k++) if (!f.bind.some(x => x.in === k)) { f.packed.push(k); break; } }
+          else for (let k = 0; k < np; k++) f.packed.push(P.num());
+          f.nOut = tout; si.folders.push(f);
+        }
+        let u;
+        while ((u = P.byte()) !== 0) {
+          if (u === 12) si.folders.forEach(f => { for (let k = 0; k < f.nOut; k++) f.unpack.push(P.num()); });
+          else if (u === 10) P.digests(nf).forEach((c, k) => si.folders[k].crc = c);
+          else throw new Error('7zヘッダを読めません');
+        }
+      } else if (t === 8) {
+        const nums = si.folders.map(() => 1); let sizes = null, crcs = null; let u;
+        while ((u = P.byte()) !== 0) {
+          if (u === 13) for (let k = 0; k < nums.length; k++) nums[k] = P.num();
+          else if (u === 9) {
+            sizes = [];
+            si.folders.forEach((f, k) => {
+              if (!nums[k]) return; let sum = 0;
+              for (let j = 0; j < nums[k] - 1; j++) { const s = P.num(); sizes.push(s); sum += s; }
+              sizes.push(folderSize(f) - sum);
+            });
+          } else if (u === 10) {
+            let cnt = 0; si.folders.forEach((f, k) => { if (nums[k] !== 1 || f.crc === undefined) cnt += nums[k]; });
+            const d = P.digests(cnt); let j = 0; crcs = [];
+            si.folders.forEach((f, k) => { if (nums[k] === 1 && f.crc !== undefined) crcs.push(f.crc); else for (let q = 0; q < nums[k]; q++) crcs.push(d[j++]); });
+          } else { P.skip(P.num()); }
+        }
+        si.sub = { nums, sizes, crcs };
+      } else throw new Error('7zヘッダを読めません');
+    }
+    // assign pack sizes to folders
+    let pi = 0;
+    si.folders.forEach(f => { f.packSizes = f.packed.map(() => si.packSizes[pi++]); });
+    return si;
+  }
+  function folderSize(f) {
+    for (let o = 0; o < f.nOut; o++) if (!f.bind.some(b => b.out === o)) return f.unpack[o];
+    return 0;
+  }
+  async function extract(buf) {
+    const sig = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
+    if (!sig.every((v, i) => buf[i] === v)) throw new Error('7zファイルではありません');
+    const P0 = parser(buf, 12);
+    const lo = P0.u32(), hi = P0.u32(); const nhOff = lo + hi * 4294967296;
+    const nlo = P0.u32(), nhi = P0.u32(); const nhSize = nlo + nhi * 4294967296;
+    if (32 + nhOff + nhSize > buf.length) throw new Error('7zファイルが途中で切れています（ダウンロード失敗かも）');
+    let hdr = buf.subarray(32 + nhOff, 32 + nhOff + nhSize);
+    for (let guard = 0; guard < 4; guard++) {
+      const P = parser(hdr, 0);
+      const t = P.byte();
+      if (t === 0x17) {
+        const si = readStreams(P);
+        let off = 32 + si.packPos;
+        hdr = await decodeFolder(buf, si.folders[0], off);
+        continue;
+      }
+      if (t !== 1) throw new Error('7zヘッダを読めません');
+      let main = null, files = [];
+      let u;
+      while ((u = P.byte()) !== 0) {
+        if (u === 2) { let x; while ((x = P.byte()) !== 0) P.skip(P.num()); }
+        else if (u === 3) readStreams(P);
+        else if (u === 4) main = readStreams(P);
+        else if (u === 5) files = readFiles(P);
+        else throw new Error('7zヘッダを読めません');
+      }
+      if (!main) return [];
+      // decode folders and slice substreams
+      const streams = [];
+      let off = 32 + main.packPos, si = 0;
+      for (let k = 0; k < main.folders.length; k++) {
+        const f = main.folders[k];
+        const n = main.sub ? main.sub.nums[k] : 1;
+        const packLen = f.packSizes.reduce((a, c) => a + c, 0);
+        if (n > 0) {
+          const data = await decodeFolder(buf, f, off);
+          let p = 0;
+          for (let j = 0; j < n; j++) {
+            const sz = main.sub && main.sub.sizes ? main.sub.sizes[si] : data.length;
+            const part = data.subarray(p, p + sz);
+            const want = main.sub && main.sub.crcs ? main.sub.crcs[si] : undefined;
+            if (want !== undefined && crc32(part) !== want) throw new Error('7zの中身が壊れています（CRC不一致）');
+            streams.push(part); p += sz; si++;
+          }
+        }
+        off += packLen;
+      }
+      let s = 0;
+      return files.filter(f => !f.dir).map(f => ({ name: f.name, data: f.empty ? new Uint8Array(0) : streams[s++] }));
+    }
+    throw new Error('7zヘッダを読めません');
+  }
+  function readFiles(P) {
+    const n = P.num();
+    const files = Array.from({ length: n }, () => ({ name: '', empty: false, dir: false }));
+    let emptyStream = null, u;
+    while ((u = P.byte()) !== 0) {
+      const size = P.num(); const start = P.pos;
+      if (u === 14) { emptyStream = P.bits(n); }
+      else if (u === 15) {
+        const cnt = emptyStream.filter(Boolean).length; const ef = P.bits(cnt); let j = 0;
+        files.forEach((f, i) => { if (emptyStream[i]) f.isFile = ef[j++]; });
+      } else if (u === 17) {
+        P.byte(); // external
+        for (let i = 0; i < n; i++) {
+          let s = '';
+          for (;;) { const c = P.byte() | (P.byte() << 8); if (!c) break; s += String.fromCharCode(c); }
+          files[i].name = s;
+        }
+      }
+      P.skip(start + size - P.pos);
+    }
+    if (emptyStream) files.forEach((f, i) => { if (emptyStream[i]) { f.empty = true; f.dir = !f.isFile; } });
+    return files;
+  }
+  return { extract, crc32 };
+})();
+if (typeof module !== 'undefined') module.exports = SevenZ;
+
+</script>
+<script>
+(() => {
+  const BITS = { B: 0x8000, Y: 0x4000, SEL: 0x2000, START: 0x1000, UP: 0x800, DOWN: 0x400, LEFT: 0x200, RIGHT: 0x100, A: 0x80, X: 0x40, L: 0x20, R: 0x10 };
+  const $ = id => document.getElementById(id);
+  const cv = $('cv'), ctx = cv.getContext('2d'), img = ctx.createImageData(256, 224);
+  const img32 = new Uint32Array(img.data.buffer);
+  let snes = null, running = false, paused = false, ff = false, muted = false;
+  let actx = null, node = null;
+  let touchBits = 0, keyBits = 0, padBits = 0;
+
+  // ---------- input ----------
+  let gpBits = 0;
+  const syncPad = () => { padBits = touchBits | keyBits | gpBits; if (snes) snes.pad[0] = padBits; };
+  // Gamepad (PS5 / Xbox / MFi): standard mapping, SFC button positions
+  const GP_MAP = [BITS.B, BITS.A, BITS.Y, BITS.X, BITS.L, BITS.R, BITS.L, BITS.R, BITS.SEL, BITS.START, 0, 0, BITS.UP, BITS.DOWN, BITS.LEFT, BITS.RIGHT];
+  let gpName = '', gpHot = 0;
+  function pollGamepad() {
+    let b = 0, name = '';
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const g of pads) {
+      if (!g || !g.connected) continue;
+      name = name || g.id;
+      g.buttons.forEach((btn, i) => { if (GP_MAP[i] && (btn.pressed || btn.value > 0.5)) b |= GP_MAP[i]; });
+      const ax = g.axes[0] || 0, ay = g.axes[1] || 0;
+      if (ax < -0.5) b |= BITS.LEFT; if (ax > 0.5) b |= BITS.RIGHT;
+      if (ay < -0.5) b |= BITS.UP; if (ay > 0.5) b |= BITS.DOWN;
+    }
+    if (name !== gpName) {
+      gpName = name;
+      document.body.classList.toggle('gp', !!name);
+      $('stat').textContent = name ? 'コントローラを認識しました：' + name.replace(/\s*\(.*$/, '') : 'コントローラが外れました';
+    }
+    let hot = 0;
+    for (const g of pads) { if (!g || !g.connected) continue; if (g.buttons[10] && g.buttons[10].pressed) hot |= 1; if (g.buttons[11] && g.buttons[11].pressed) hot |= 2; }
+    if ((hot & 1) && !(gpHot & 1)) saveState();
+    if ((hot & 2) && !(gpHot & 2)) loadState();
+    gpHot = hot;
+    if (b !== gpBits) { gpBits = b; syncPad(); }
+  }
+  addEventListener('gamepadconnected', pollGamepad);
+  addEventListener('gamepaddisconnected', pollGamepad);
+  const KEYMAP = { ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT', KeyX: 'A', KeyZ: 'B', KeyS: 'X', KeyA: 'Y', KeyQ: 'L', KeyW: 'R', Enter: 'START', ShiftLeft: 'SEL', ShiftRight: 'SEL' };
+  addEventListener('keydown', e => { const k = KEYMAP[e.code]; if (!k || e.target.tagName === 'INPUT') return; e.preventDefault(); keyBits |= BITS[k]; syncPad(); });
+  addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (!k) return; keyBits &= ~BITS[k]; syncPad(); });
+  addEventListener('blur', () => { keyBits = 0; touchBits = 0; syncPad(); });
+
+  document.querySelectorAll('[data-k]').forEach(el => {
+    const bit = BITS[el.dataset.k];
+    const down = e => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); touchBits |= bit; el.classList.add('on'); syncPad(); };
+    const up = () => { touchBits &= ~bit; el.classList.remove('on'); syncPad(); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  });
+  const dpad = $('dpad'); const DIRS = BITS.UP | BITS.DOWN | BITS.LEFT | BITS.RIGHT;
+  const dpadSet = e => {
+    const r = dpad.getBoundingClientRect(); const x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+    const dz = r.width * 0.12; let b = 0;
+    if (Math.hypot(x, y) > dz) {
+      const a = Math.atan2(y, x) * 180 / Math.PI; // -180..180, 0 = right
+      if (a > -67.5 && a < 67.5) b |= BITS.RIGHT;
+      if (a > 112.5 || a < -112.5) b |= BITS.LEFT;
+      if (a > 22.5 && a < 157.5) b |= BITS.DOWN;
+      if (a < -22.5 && a > -157.5) b |= BITS.UP;
+    }
+    touchBits = (touchBits & ~DIRS) | b;
+    dpad.className = 'dpad' + (b & BITS.UP ? ' u' : '') + (b & BITS.DOWN ? ' d' : '') + (b & BITS.LEFT ? ' l' : '') + (b & BITS.RIGHT ? ' r' : '');
+    syncPad();
+  };
+  const dpadUp = () => { touchBits &= ~DIRS; dpad.className = 'dpad'; syncPad(); };
+  dpad.addEventListener('pointerdown', e => { e.preventDefault(); dpad.setPointerCapture?.(e.pointerId); dpadSet(e); });
+  dpad.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') dpadSet(e); });
+  dpad.addEventListener('pointerup', dpadUp); dpad.addEventListener('pointercancel', dpadUp);
+  $('deck').addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+  // ---------- audio ----------
+  function startAudio() {
+    if (actx) { actx.resume?.(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      actx = new AC();
+      node = actx.createScriptProcessor(2048, 0, 2);
+      let frac = 0;
+      node.onaudioprocess = ev => {
+        const L = ev.outputBuffer.getChannelData(0), R = ev.outputBuffer.getChannelData(1);
+        const n = L.length;
+        if (!snes || paused || muted) { L.fill(0); R.fill(0); return; }
+        const d = snes.apu.dsp, size = d.bufSize;
+        let avail = (d.wpos - d.rpos + size) % size;
+        const step = 32000 / actx.sampleRate;
+        // keep latency bounded
+        if (avail > 6000) { d.rpos = (d.wpos - 3000 + size) % size; avail = 3000; }
+        let lastL = 0, lastR = 0;
+        for (let i = 0; i < n; i++) {
+          if (avail > 1) {
+            const p0 = d.rpos, p1 = (p0 + 1) % size;
+            lastL = d.outL[p0] + (d.outL[p1] - d.outL[p0]) * frac;
+            lastR = d.outR[p0] + (d.outR[p1] - d.outR[p0]) * frac;
+            frac += step;
+            while (frac >= 1 && avail > 1) { frac -= 1; d.rpos = (d.rpos + 1) % size; avail--; }
+          }
+          L[i] = lastL; R[i] = lastR;
+        }
+      };
+      node.connect(actx.destination);
+    } catch (e) { actx = null; }
+  }
+
+  // ---------- save RAM ----------
+  const key = () => 'sfc-sram:' + snes.title + ':' + snes.rom.length;
+  function loadSram() {
+    try {
+      const s = localStorage.getItem(key()); if (!s) return false;
+      const bin = atob(s); const n = Math.min(bin.length, snes.sram.length);
+      for (let i = 0; i < n; i++) snes.sram[i] = bin.charCodeAt(i);
+      return true;
+    } catch (e) { return false; }
+  }
+  function saveSram() {
+    if (!snes || !snes.sram.length || !snes.sramDirty) return;
+    snes.sramDirty = false;
+    try { let s = ''; const a = snes.sram; for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); localStorage.setItem(key(), btoa(s)); } catch (e) { }
+  }
+  setInterval(saveSram, 2000);
+  addEventListener('pagehide', saveSram);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveSram(); });
+
+  // ---------- fullscreen / landscape ----------
+  const mqLand = matchMedia('(orientation: landscape) and (max-height: 540px)');
+  function setImm(on, auto) {
+    document.body.classList.toggle('imm', on);
+    $('full').setAttribute('aria-pressed', on);
+    if (on && !auto) {
+      try {
+        const el = document.documentElement;
+        const pr = el.requestFullscreen ? el.requestFullscreen() : (el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null);
+        Promise.resolve(pr).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape')).catch(() => { });
+      } catch (e) { }
+    } else if (document.fullscreenElement) { try { document.exitFullscreen().catch(() => { }); } catch (e) { } }
+  }
+  $('full').onclick = () => setImm(!document.body.classList.contains('imm'));
+  $('exitFull').onclick = () => setImm(false);
+  addEventListener('keydown', e => { if (e.code === 'Escape') setImm(false); if (e.code === 'F2') { e.preventDefault(); saveState(); } if (e.code === 'F4') { e.preventDefault(); loadState(); } });
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !isLand()) setImm(false, true); });
+  // orientation by actual size (works inside embedded frames too)
+  const isLand = () => innerWidth > innerHeight && innerHeight <= 600;
+  let lastLand = null;
+  const checkLand = () => {
+    const L = isLand();
+    if (L !== lastLand) { lastLand = L; document.body.classList.toggle('land', L); setImm(L, true); }
+  };
+  addEventListener('resize', checkLand); addEventListener('orientationchange', () => setTimeout(checkLand, 200));
+  setInterval(checkLand, 500); checkLand();
+
+  // ---------- save states ----------
+  let slot = 1, toastT = 0;
+  const toast = msg => { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 1800); $('stat').textContent = msg; };
+  const stKey = n => 'sfc-state:' + snes.title + ':' + snes.rom.length + ':' + n;
+  const memStates = {};
+  const hhmm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  function slotLabel() {
+    let when = '';
+    try { const m = localStorage.getItem(stKey(slot) + ':t'); if (m) when = ' ' + hhmm(new Date(+m)); } catch (e) { }
+    if (!when && memStates[stKey(slot)]) when = ' ' + hhmm(new Date(memStates[stKey(slot)].t));
+    $('slot').textContent = 'スロット' + slot + (when || ' 空き');
+  }
+  function saveState() {
+    if (!snes) return;
+    const str = encodeState(snes.saveState()), k = stKey(slot), now = Date.now();
+    memStates[k] = { str, t: now };
+    let persisted = true;
+    try { localStorage.setItem(k, str); localStorage.setItem(k + ':t', String(now)); } catch (e) { persisted = false; }
+    toast(persisted ? 'スロット' + slot + 'にセーブしました' : 'スロット' + slot + 'にセーブしました（容量不足のため、このページを閉じると消えます）');
+    slotLabel();
+  }
+  function loadState() {
+    if (!snes) return;
+    const k = stKey(slot);
+    let str = null;
+    try { str = localStorage.getItem(k); } catch (e) { }
+    if (!str && memStates[k]) str = memStates[k].str;
+    if (!str) { toast('スロット' + slot + 'にはセーブがありません'); return; }
+    try { snes.loadState(decodeState(str)); syncPad(); toast('スロット' + slot + 'をロードしました'); }
+    catch (e) { toast('ロードできませんでした：' + e.message); }
+  }
+  $('slot').onclick = () => { slot = slot % 3 + 1; slotLabel(); };
+  $('ssave').onclick = saveState; $('sload').onclick = loadState;
+  $('issave').onclick = saveState; $('isload').onclick = loadState;
+
+  // ---------- ROM loading ----------
+  const pick = () => { startAudio(); $('file').click(); };
+  $('load').onclick = pick; $('load2').onclick = pick;
+  $('file').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    e.target.value = '';
+    $('stat').textContent = f.name + ' を読み込み中…';
+    try {
+      let buf = new Uint8Array(await f.arrayBuffer());
+      if (buf[0] === 0x50 && buf[1] === 0x4B) {
+        if (!window.JSZip) throw new Error('zipの展開機能を読み込めませんでした。解凍してから開いてください');
+        const zip = await JSZip.loadAsync(buf);
+        const files = Object.values(zip.files).filter(z => !z.dir);
+        const roms = files.filter(z => /\.(sfc|smc|fig|swc|bin)$/i.test(z.name));
+        const pickF = (roms.length ? roms : files).sort((a, b) => (b._data?.uncompressedSize || 0) - (a._data?.uncompressedSize || 0))[0];
+        if (!pickF) throw new Error('zipの中にROMが見つかりません');
+        buf = await pickF.async('uint8array');
+      } else if (buf[0] === 0x37 && buf[1] === 0x7A && buf[2] === 0xBC) {
+        $('stat').textContent = f.name + ' を展開中…';
+        await new Promise(r => setTimeout(r, 30));
+        const files = (await SevenZ.extract(buf)).filter(z => z.data.length);
+        const roms = files.filter(z => /\.(sfc|smc|fig|swc|bin)$/i.test(z.name));
+        const pickF = (roms.length ? roms : files).sort((a, b) => b.data.length - a.data.length)[0];
+        if (!pickF) throw new Error('7zの中にROMが見つかりません');
+        buf = pickF.data;
+      }
+      else if (buf[0] === 0x52 && buf[1] === 0x61 && buf[2] === 0x72) throw new Error('rar形式は未対応です。解凍してから開いてください');
+      if (buf.length < 0x8000) throw new Error('ファイルが小さすぎます（' + buf.length + 'バイト）。ROMではないかもしれません');
+      saveSram();
+      snes = new SNES(); snes.loadROM(buf);
+      const had = snes.sram.length ? loadSram() : false;
+      if (had) snes.reset();
+      $('title').textContent = snes.title + (snes.hirom ? '  ·  HiROM' : '  ·  LoROM');
+      $('stat').textContent = snes.sram.length ? (had ? 'セーブデータを読み込みました' : 'セーブ対応ソフト') : '起動しました';
+      $('idle').hidden = true;
+      ['pause', 'ff', 'reset', 'slot', 'ssave', 'sload'].forEach(id => $(id).disabled = false);
+      slot = 1; slotLabel();
+      paused = false; $('pause').setAttribute('aria-pressed', 'false');
+      syncPad();
+      if (!running) { running = true; last = performance.now(); acc = 0; requestAnimationFrame(loop); }
+    } catch (err) {
+      $('stat').textContent = '読み込めませんでした：' + (err && err.message ? err.message : err);
+    }
+  };
+  $('pause').onclick = () => { paused = !paused; $('pause').setAttribute('aria-pressed', paused); $('stat').textContent = paused ? '一時停止中' : '再開'; if (!paused) last = performance.now(); };
+  $('ff').onclick = () => { ff = !ff; $('ff').setAttribute('aria-pressed', ff); };
+  $('mute').onclick = () => { muted = !muted; $('mute').setAttribute('aria-pressed', muted); startAudio(); };
+  $('reset').onclick = () => { if (!snes) return; saveSram(); snes.reset(); $('stat').textContent = 'リセットしました'; };
+
+  // ---------- look & feel ----------
+  try { if (localStorage.getItem('sfc-scan') === '1') { document.body.classList.add('scan'); $('scan').setAttribute('aria-pressed', 'true'); } } catch (e) { }
+  $('scan').onclick = () => {
+    const on = !document.body.classList.contains('scan');
+    document.body.classList.toggle('scan', on); $('scan').setAttribute('aria-pressed', on);
+    try { localStorage.setItem('sfc-scan', on ? '1' : '0'); } catch (e) { }
+  };
+  (function idleArt() {
+    const c = $('idlecv'), g = c.getContext('2d'), W = 256, H = 224, HZ = 132;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const R = (col, x, y, w, h) => { g.fillStyle = col; g.fillRect(x | 0, y | 0, w, h); };
+    const sky = ['#05071a', '#080b22', '#0b0f2b', '#0f1434', '#13193d', '#171f47', '#1c2551', '#222c5c', '#293467', '#313d72', '#3a467c', '#45508a'];
+    const stars = Array.from({ length: 56 }, (_, i) => ({ x: (i * 97 + 13) % W, y: (i * 41 + 7) % 104, p: i % 9, big: i % 11 === 0 }));
+    const ridge = (seed, amp, base, x) => base - Math.round(amp * (0.55 * Math.sin(x * 0.031 + seed) + 0.3 * Math.sin(x * 0.083 + seed * 2.1) + 0.15 * Math.sin(x * 0.19 + seed * 3.7)));
+    const floor = g.createImageData(W, H - HZ), f32 = new Uint32Array(floor.data.buffer);
+    const rgb = h => { const n = parseInt(h.slice(1), 16); return 0xFF000000 | ((n & 255) << 16) | (n & 0xFF00) | (n >> 16); };
+    const FA = [rgb('#1b4a52'), rgb('#22606a')], FB = [rgb('#122f37'), rgb('#173b44')], FOG = rgb('#45508a');
+    const Q = ['0011111100', '0111111110', '1110000111', '1100000011', '0000000111', '0000001110', '0000011100', '0000111000', '0000110000', '0000110000', '0000000000', '0000110000', '0000110000'];
+    let t = 0;
+    function cart(cx, cy) {
+      const O = '#14161c', P0 = '#f4f0e6', P1 = '#e4ddcc', P2 = '#d2c9b4', P3 = '#b3a990', P4 = '#8f866f';
+      R(O, cx + 4, cy, 64, 1); R(O, cx + 2, cy + 1, 2, 1); R(O, cx + 68, cy + 1, 2, 1); R(O, cx + 1, cy + 2, 1, 2); R(O, cx + 70, cy + 2, 1, 2);
+      R(O, cx, cy + 4, 1, 54); R(O, cx + 71, cy + 4, 1, 54); R(O, cx + 1, cy + 58, 70, 2);
+      R(P1, cx + 4, cy + 1, 64, 1); R(P1, cx + 2, cy + 2, 68, 2); R(P1, cx + 1, cy + 4, 70, 54);
+      R(P0, cx + 4, cy + 1, 60, 1); R(P0, cx + 2, cy + 2, 2, 2); R(P0, cx + 1, cy + 4, 2, 50);
+      R(P2, cx + 60, cy + 4, 8, 50); R(P3, cx + 68, cy + 3, 3, 55); R(P3, cx + 3, cy + 52, 66, 3); R(P4, cx + 1, cy + 55, 70, 3);
+      for (let i = 0; i < 4; i++) { R(P3, cx + 10, cy + 4 + i * 3, 52, 1); R(P0, cx + 10, cy + 5 + i * 3, 52, 1); }
+      R(O, cx + 8, cy + 17, 56, 1); R(O, cx + 8, cy + 47, 56, 1); R(O, cx + 7, cy + 18, 1, 29); R(O, cx + 64, cy + 18, 1, 29);
+      const lab = ['#6a7186', '#5d6477', '#545a69', '#4a5060', '#424756', '#3b404d', '#353946'];
+      for (let i = 0; i < 29; i++) R(lab[Math.min(6, (i / 4) | 0)], cx + 8, cy + 18 + i, 56, 1);
+      R('#f39a80', cx + 8, cy + 18, 56, 1); R('#e0573a', cx + 8, cy + 19, 56, 5); R('#a93c25', cx + 8, cy + 24, 56, 1);
+      for (let x = 0; x < 56; x += 2) R('#c84a30', cx + 8 + x, cy + 23, 1, 1);
+      Q.forEach((row, y) => [...row].forEach((v, x) => { if (v === '1') { R('#14161c', cx + 32 + x, cy + 28 + y, 1, 1); R('#f5f0e4', cx + 31 + x, cy + 27 + y, 1, 1); } }));
+      R('#7a8196', cx + 9, cy + 25, 1, 21);
+    }
+    function frame() {
+      if ($('idle').hidden) return;
+      requestAnimationFrame(frame);
+      t++;
+      if (t % 2) return;
+      // sky bands with checker dither seams
+      const bh = Math.ceil(HZ / sky.length);
+      sky.forEach((col, i) => R(col, 0, i * bh, W, bh));
+      for (let i = 1; i < sky.length; i++) { const y = i * bh; g.fillStyle = sky[i]; for (let x = 0; x < W; x += 2) { g.fillRect(x, y - 2, 1, 1); g.fillRect(x + 1, y - 1, 1, 1); } g.fillStyle = sky[i - 1]; for (let x = 0; x < W; x += 2) g.fillRect(x + 1, y, 1, 1); }
+      stars.forEach(st => {
+        const ph = ((t >> 3) + st.p) % 9;
+        const col = ph === 0 ? '#ffffff' : ph < 3 ? '#c9cdf0' : ph < 6 ? '#7d84b8' : '#4a5287';
+        R(col, st.x, st.y, 1, 1);
+        if (st.big && ph < 2) { R('#7d84b8', st.x - 1, st.y, 1, 1); R('#7d84b8', st.x + 1, st.y, 1, 1); R('#7d84b8', st.x, st.y - 1, 1, 1); R('#7d84b8', st.x, st.y + 1, 1, 1); }
+      });
+      // parallax mountains
+      const s1 = reduce ? 0 : t * 0.05, s2 = reduce ? 0 : t * 0.12;
+      for (let x = 0; x < W; x++) {
+        const y1 = ridge(1.3, 18, 112, x + s1), y2 = ridge(4.1, 12, 126, x + s2);
+        R('#2a3270', x, y1, 1, HZ - y1); R('#4b569a', x, y1, 1, 1);
+        R('#1c2252', x, y2, 1, HZ - y2); R('#323b7a', x, y2, 1, 1);
+      }
+      // perspective floor (scrolling)
+      const sc = reduce ? 0 : t * 0.6;
+      for (let y = 0; y < H - HZ; y++) {
+        const d = 48 / (y + 2), wz = d * 64 + sc, fog = Math.max(0, 1 - y / 26);
+        for (let x = 0; x < W; x++) {
+          const wx = (x - 128) * d;
+          const chk = ((Math.floor(wx / 10) + Math.floor(wz / 10)) & 1);
+          const line = ((wx % 10 + 10) % 10) < d * 0.9 || ((wz % 10 + 10) % 10) < d * 0.9;
+          let v = line ? FA[1] : (chk ? FA[0] : FB[0]);
+          if ((y < 4 && ((x + y) & 1)) || (y < 10 && (x & 1) && (y & 1)) || (y < 18 && !(x & 3) && !(y & 3))) v = FOG;
+          f32[y * W + x] = v;
+        }
+      }
+      g.putImageData(floor, 0, HZ);
+      R('#6a76bd', 0, HZ, W, 1);
+      // cartridge + shadow
+      const bob = reduce ? 0 : Math.round(Math.sin(t / 22) * 3);
+      const cx = 92, cy = 18 + bob;
+      g.globalAlpha = .35; R('#000', cx + 8 - bob, 148, 56 + bob * 2, 4); R('#000', cx + 14 - bob, 152, 44 + bob * 2, 2); g.globalAlpha = 1;
+      cart(cx, cy);
+      if (!reduce) { const k = (t >> 2) % 40; if (k < 8) { const sx = cx + 70, sy = cy + 4; const col = k < 4 ? '#ffffff' : '#c9cdf0'; R(col, sx, sy - (k & 3), 1, 1 + 2 * (k & 3)); R(col, sx - (k & 3), sy, 1 + 2 * (k & 3), 1); } }
+    }
+    frame();
+  })();
+  const markOn = () => document.body.classList.toggle('on', !!snes && !paused);
+  setInterval(markOn, 300);
+
+  // ---------- main loop ----------
+  requestAnimationFrame(function idlePoll(){ if (!running) { pollGamepad(); requestAnimationFrame(idlePoll); } });
+  const FRAME = 1000 / 60.0988;
+  let last = 0, acc = 0, frames = 0, fpsT = 0, dtAvg = 16.7;
+  function loop(t) {
+    requestAnimationFrame(loop);
+    pollGamepad();
+    if (!snes || paused) return;
+    const dt = Math.min(t - last, 100); last = t;
+    dtAvg += (dt - dtAvg) * 0.05;
+    const locked = dtAvg > 15.5 && dtAvg < 18 && dt < 25;
+    acc = locked ? FRAME : acc + dt;
+    let n = 0;
+    const speed = ff ? 3 : 1;
+    while (acc >= FRAME - 0.01 && n < 4 * speed) {
+      for (let k = 0; k < speed; k++) { try { snes.runFrame(); } catch (e) { paused = true; $('stat').textContent = 'エミュレーションが停止しました（未対応の機能かもしれません）'; return; } frames++; }
+      acc -= FRAME; n++;
+    }
+    if (acc > FRAME * 4) acc = 0;
+    if (n) { img32.set(snes.ppu.image); ctx.putImageData(img, 0, 0); }
+    if (t - fpsT > 1000) { $('fps').textContent = Math.round(frames * 1000 / (t - fpsT)) + ' fps'; frames = 0; fpsT = t; }
+  }
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { }));
+</script>
+</body>
+</html>

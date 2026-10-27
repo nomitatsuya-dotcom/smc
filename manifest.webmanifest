@@ -1,7 +1,7 @@
 {
   "name": "Claude SFC",
   "short_name": "Claude SFC",
-  "description": "ブラウザで動く16ビットゲーム機エミュレータ",
+  "description": "スーファミ・ファミコン・ゲームボーイ対応のエミュレータ",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

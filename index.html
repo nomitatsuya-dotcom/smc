@@ -84,6 +84,7 @@ body.scan .screen::after{content:"";position:absolute;inset:0;pointer-events:non
 .lcd span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* pad panel */
+body.bit8 .shoulder{opacity:.4}
 .deck{background:linear-gradient(180deg,var(--putty-hi) 0 4px,var(--putty) 4px calc(100% - 6px),var(--putty-lo) calc(100% - 6px));padding:16px 14px 14px;--px:6px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-rows:auto 1fr auto;gap:12px 8px;touch-action:none;
   box-shadow:inset 2px 0 0 var(--putty-hi),inset -2px 0 0 var(--putty-lo)}
 .shoulder{grid-row:1;height:34px;border:0;background:linear-gradient(180deg,var(--slate-hi) 0 2px,var(--slate) 2px calc(100% - 4px),var(--slate-lo) calc(100% - 4px));color:var(--putty);font:15px var(--f-pix);touch-action:none;text-shadow:1px 1px 0 var(--slate-lo)}
@@ -126,7 +127,7 @@ body.imm .exit{display:block;position:absolute;z-index:3;top:calc(8px + env(safe
 body.imm .main{display:block;height:100%}
 body.imm .main>div:first-child{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 body.imm .bay,body.imm .bezel{padding:0;background:none;box-shadow:none;clip-path:none}
-body.imm .screen{width:min(100vw,calc(100vh * 8 / 7));width:min(100vw,calc(100dvh * 8 / 7))}
+body.imm .screen{width:min(100vw,calc(100vh * var(--ar,1.142857)));width:min(100vw,calc(100dvh * var(--ar,1.142857)))}
 body.imm .deck{position:absolute;inset:0;background:none;padding:0;display:block;pointer-events:none;box-shadow:none;clip-path:none}
 body.imm .deck>*{position:absolute;pointer-events:auto;opacity:.6}
 body.imm .well{background:none}
@@ -155,7 +156,7 @@ body.imm:not(.land) .screen{width:100vw}
 
 <div class="app">
   <header>
-    <div class="brand"><div class="logo">CLAUDE<em>SFC</em></div><div class="tag">16-BIT ENTERTAINMENT DECK</div></div>
+    <div class="brand"><div class="logo">CLAUDE<em>SFC</em></div><div class="tag">8/16-BIT ENTERTAINMENT DECK</div></div>
     <div class="title" id="title">ROM未ロード</div>
     <div class="tools">
       <button class="tb px1 primary" id="load">ROMを開く</button>
@@ -179,14 +180,14 @@ body.imm:not(.land) .screen{width:100vw}
   <div class="main">
     <div>
       <div class="bay px2">
-        <div class="bay-top"><span class="led"><i></i>POWER</span><span>VIDEO 256×224</span></div>
+        <div class="bay-top"><span class="led"><i></i>POWER</span><span id="vidlabel">VIDEO 256×224</span></div>
         <div class="bezel px2">
           <div class="screen">
             <canvas id="cv" width="256" height="224"></canvas>
             <div class="idle" id="idle">
               <canvas id="idlecv" width="256" height="224"></canvas>
               <div class="win px1"><h1>カセットをセットしてください</h1>
-              <p>手持ちのROM（.sfc / .smc / .zip / .7z）を開くと起動します。ファイルは端末内だけで読み込まれ、どこにも送信されません。</p>
+              <p>スーファミ・ファミコン・ゲームボーイ（カラー）の手持ちのROMを開くと、機種を自動で判別して起動します。ファイルは端末内だけで読み込まれ、どこにも送信されません。</p>
               <button class="tb px1 primary blink-wrap" id="load2"><span class="blink">▶</span> ROMを開く</button></div>
             </div>
           </div>
@@ -1289,7 +1290,7 @@ class DSP {
   constructor(apu) {
     this.apu = apu; this.regs = new Uint8Array(128);
     this.bufSize = 16384; this.outL = new Float32Array(this.bufSize); this.outR = new Float32Array(this.bufSize);
-    this.wpos = 0; this.rpos = 0;
+    this.wpos = 0; this.rpos = 0; this.rate = 32000;
     this.voices = [];
     for (let i = 0; i < 8; i++) this.voices.push({ addr: 0, counter: 0, buf: new Int16Array(16), last: 0, p1: 0, p2: 0, hdr: 0, state: 3, env: 0, envCnt: 0, out: 0 });
     this.firL = new Int32Array(8); this.firR = new Int32Array(8);
@@ -1820,7 +1821,1417 @@ function decodeState(str) {
     return v;
   });
 }
+
+// common system interface
+Object.defineProperties(SNES.prototype, {
+  system: { get() { return 'sfc'; } }, width: { get() { return 256; } }, height: { get() { return 224; } }, fps: { get() { return 60.0988; } },
+  image: { get() { return this.ppu.image; } }, audio: { get() { return this.apu.dsp; } },
+  label: { get() { return 'SFC · ' + (this.hirom ? 'HiROM' : 'LoROM'); } },
+});
 if (typeof module !== 'undefined') module.exports = { SNES, encodeState, decodeState };
+// ===== Famicom / NES =====
+const NES_RGB = [
+  0x666666, 0x002A88, 0x1412A7, 0x3B00A4, 0x5C007E, 0x6E0040, 0x6C0600, 0x561D00, 0x333500, 0x0B4800, 0x005200, 0x004F08, 0x00404D, 0x000000, 0x000000, 0x000000,
+  0xADADAD, 0x155FD9, 0x4240FF, 0x7527FE, 0xA01ACC, 0xB71E7B, 0xB53120, 0x994E00, 0x6B6D00, 0x388700, 0x0C9300, 0x008F32, 0x007C8D, 0x000000, 0x000000, 0x000000,
+  0xFFFEFF, 0x64B0FF, 0x9290FF, 0xC676FF, 0xF36AFF, 0xFE6ECC, 0xFE8170, 0xEA9E22, 0xBCBE00, 0x88D800, 0x5CE430, 0x45E082, 0x48CDDE, 0x4F4F4F, 0x000000, 0x000000,
+  0xFFFEFF, 0xC0DFFF, 0xD3D2FF, 0xE8C8FF, 0xFBC2FF, 0xFEC4EA, 0xFECCC5, 0xF7D8A5, 0xE4E594, 0xCFEF96, 0xBDF4AB, 0xB3F3CC, 0xB5EBF2, 0xB8B8B8, 0x000000, 0x000000];
+// 8 emphasis variants, ABGR for canvas
+const NES_LUT = (() => {
+  const t = new Uint32Array(512);
+  for (let e = 0; e < 8; e++) for (let i = 0; i < 64; i++) {
+    let c = NES_RGB[i], r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+    if (e) {
+      const er = e & 1, eg = e & 2, eb = e & 4, k = 0.78;
+      if (!er) r *= k; if (!eg) g *= k; if (!eb) b *= k;
+    }
+    t[e * 64 + i] = 0xFF000000 | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0);
+  }
+  return t;
+})();
+
+// ---------- 6502 ----------
+const NES_MN = ('BRK ORA KIL SLO NOP ORA ASL SLO PHP ORA ASL ANC NOP ORA ASL SLO BPL ORA KIL SLO NOP ORA ASL SLO CLC ORA NOP SLO NOP ORA ASL SLO ' +
+  'JSR AND KIL RLA BIT AND ROL RLA PLP AND ROL ANC BIT AND ROL RLA BMI AND KIL RLA NOP AND ROL RLA SEC AND NOP RLA NOP AND ROL RLA ' +
+  'RTI EOR KIL SRE NOP EOR LSR SRE PHA EOR LSR ALR JMP EOR LSR SRE BVC EOR KIL SRE NOP EOR LSR SRE CLI EOR NOP SRE NOP EOR LSR SRE ' +
+  'RTS ADC KIL RRA NOP ADC ROR RRA PLA ADC ROR ARR JMP ADC ROR RRA BVS ADC KIL RRA NOP ADC ROR RRA SEI ADC NOP RRA NOP ADC ROR RRA ' +
+  'NOP STA NOP SAX STY STA STX SAX DEY NOP TXA XAA STY STA STX SAX BCC STA KIL AHX STY STA STX SAX TYA STA TXS TAS SHY STA SHX AHX ' +
+  'LDY LDA LDX LAX LDY LDA LDX LAX TAY LDA TAX LAX LDY LDA LDX LAX BCS LDA KIL LAX LDY LDA LDX LAX CLV LDA TSX LAS LDY LDA LDX LAX ' +
+  'CPY CMP NOP DCP CPY CMP DEC DCP INY CMP DEX AXS CPY CMP DEC DCP BNE CMP KIL DCP NOP CMP DEC DCP CLD CMP NOP DCP NOP CMP DEC DCP ' +
+  'CPX SBC NOP ISC CPX SBC INC ISC INX SBC NOP SBC CPX SBC INC ISC BEQ SBC KIL ISC NOP SBC INC ISC SED SBC NOP ISC NOP SBC INC ISC').split(' ');
+const NES_CYC = [
+  7, 6, 2, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6, 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+  6, 6, 2, 8, 3, 3, 5, 5, 4, 2, 2, 2, 4, 4, 6, 6, 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+  6, 6, 2, 8, 3, 3, 5, 5, 3, 2, 2, 2, 3, 4, 6, 6, 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+  6, 6, 2, 8, 3, 3, 5, 5, 4, 2, 2, 2, 5, 4, 6, 6, 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+  2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4, 2, 6, 2, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
+  2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4, 2, 5, 2, 5, 4, 4, 4, 4, 2, 4, 2, 4, 4, 4, 4, 4,
+  2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6, 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+  2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6, 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7];
+// modes: 0 imp 1 acc 2 imm 3 zp 4 zpx 5 zpy 6 abs 7 abx 8 aby 9 ind 10 izx 11 izy 12 rel
+const NES_MODE = new Uint8Array(256), NES_OPID = new Uint8Array(256), NES_PEN = new Uint8Array(256);
+const NES_NAMES = [...new Set(NES_MN)];
+(() => {
+  const pen = new Set(['ORA', 'AND', 'EOR', 'ADC', 'SBC', 'CMP', 'LDA', 'LDX', 'LDY', 'LAX', 'NOP', 'LAS']);
+  for (let op = 0; op < 256; op++) {
+    const r = op >> 4, c = op & 15, odd = r & 1; let m;
+    switch (c) {
+      case 0: m = odd ? 12 : (op === 0x20 ? 6 : r >= 8 ? 2 : 0); break;
+      case 1: case 3: m = odd ? 11 : 10; break;
+      case 2: m = (!odd && r >= 8) ? 2 : 0; break;
+      case 4: case 5: m = odd ? 4 : 3; break;
+      case 6: case 7: m = odd ? ((op === 0x96 || op === 0x97 || op === 0xB6 || op === 0xB7) ? 5 : 4) : 3; break;
+      case 8: m = 0; break;
+      case 9: case 11: m = odd ? 8 : 2; break;
+      case 10: m = (!odd && r < 8) ? 1 : 0; break;
+      case 12: m = odd ? 7 : (op === 0x6C ? 9 : 6); break;
+      case 13: m = odd ? 7 : 6; break;
+      default: m = odd ? ((op === 0x9E || op === 0x9F || op === 0xBE || op === 0xBF) ? 8 : 7) : 6;
+    }
+    NES_MODE[op] = m; NES_OPID[op] = NES_NAMES.indexOf(NES_MN[op]);
+    NES_PEN[op] = (m === 7 || m === 8 || m === 11) && pen.has(NES_MN[op]) ? 1 : 0;
+  }
+})();
+const NO = {}; NES_NAMES.forEach((n, i) => NO[n] = i);
+
+class NesCPU {
+  constructor(nes) { this.nes = nes; this.A = 0; this.X = 0; this.Y = 0; this.S = 0xFD; this.P = 0x24; this.PC = 0; this.nmiPending = false; this.irqLine = false; this.acc = 0; }
+  rd(a) { this.acc++; return this.nes.read(a); }
+  wr(a, v) { this.acc++; this.nes.write(a, v & 0xFF); }
+  reset() { this.S = (this.S - 3) & 0xFF; this.P |= 4; this.PC = this.nes.read(0xFFFC) | (this.nes.read(0xFFFD) << 8); this.nmiPending = false; }
+  push(v) { this.wr(0x100 | this.S, v); this.S = (this.S - 1) & 0xFF; }
+  pull() { this.S = (this.S + 1) & 0xFF; return this.rd(0x100 | this.S); }
+  nz(v) { this.P = (this.P & 0x7D) | (v & 0x80) | ((v & 0xFF) ? 0 : 2); return v & 0xFF; }
+  interrupt(vec, brk) {
+    this.push(this.PC >> 8); this.push(this.PC & 0xFF); this.push((this.P | 0x20) & (brk ? 0xFF : 0xEF) | (brk ? 0x10 : 0));
+    this.P |= 4; this.PC = this.rd(vec) | (this.rd(vec + 1) << 8);
+  }
+  adc(v) {
+    const r = this.A + v + (this.P & 1);
+    this.P = (this.P & 0x3C) | (r > 0xFF ? 1 : 0) | ((~(this.A ^ v) & (this.A ^ r) & 0x80) ? 0x40 : 0);
+    this.A = this.nz(r);
+  }
+  cmp(reg, v) { const r = reg - v; this.P = (this.P & ~1) | (r >= 0 ? 1 : 0); this.nz(r); }
+  step() {
+    this.acc = 0;
+    if (this.nmiPending) { this.nmiPending = false; this.interrupt(0xFFFA, false); return 7; }
+    if (this.irqLine && !(this.P & 4)) { this.interrupt(0xFFFE, false); return 7; }
+    const op = this.rd(this.PC); this.PC = (this.PC + 1) & 0xFFFF;
+    let cyc = NES_CYC[op], a = 0, cross = 0, t, v;
+    switch (NES_MODE[op]) {
+      case 2: a = this.PC; this.PC = (this.PC + 1) & 0xFFFF; break;
+      case 3: a = this.rd(this.PC); this.PC = (this.PC + 1) & 0xFFFF; break;
+      case 4: a = (this.rd(this.PC) + this.X) & 0xFF; this.PC = (this.PC + 1) & 0xFFFF; break;
+      case 5: a = (this.rd(this.PC) + this.Y) & 0xFF; this.PC = (this.PC + 1) & 0xFFFF; break;
+      case 6: a = this.rd(this.PC) | (this.rd((this.PC + 1) & 0xFFFF) << 8); this.PC = (this.PC + 2) & 0xFFFF; break;
+      case 7: t = this.rd(this.PC) | (this.rd((this.PC + 1) & 0xFFFF) << 8); this.PC = (this.PC + 2) & 0xFFFF; a = (t + this.X) & 0xFFFF; cross = (t ^ a) & 0x100; break;
+      case 8: t = this.rd(this.PC) | (this.rd((this.PC + 1) & 0xFFFF) << 8); this.PC = (this.PC + 2) & 0xFFFF; a = (t + this.Y) & 0xFFFF; cross = (t ^ a) & 0x100; break;
+      case 9: t = this.rd(this.PC) | (this.rd((this.PC + 1) & 0xFFFF) << 8); this.PC = (this.PC + 2) & 0xFFFF; a = this.rd(t) | (this.rd((t & 0xFF00) | ((t + 1) & 0xFF)) << 8); break;
+      case 10: t = (this.rd(this.PC) + this.X) & 0xFF; this.PC = (this.PC + 1) & 0xFFFF; a = this.rd(t) | (this.rd((t + 1) & 0xFF) << 8); break;
+      case 11: t = this.rd(this.PC); this.PC = (this.PC + 1) & 0xFFFF; t = this.rd(t) | (this.rd((t + 1) & 0xFF) << 8); a = (t + this.Y) & 0xFFFF; cross = (t ^ a) & 0x100; break;
+      case 12: t = this.rd(this.PC); this.PC = (this.PC + 1) & 0xFFFF; a = (this.PC + ((t << 24) >> 24)) & 0xFFFF; break;
+    }
+    if (cross && NES_PEN[op]) cyc++;
+    const br = c => { if (c) { cyc += ((a ^ this.PC) & 0x100) ? 2 : 1; this.PC = a; } };
+    switch (NES_OPID[op]) {
+      case NO.LDA: this.A = this.nz(this.rd(a)); break;
+      case NO.LDX: this.X = this.nz(this.rd(a)); break;
+      case NO.LDY: this.Y = this.nz(this.rd(a)); break;
+      case NO.STA: this.wr(a, this.A); break;
+      case NO.STX: this.wr(a, this.X); break;
+      case NO.STY: this.wr(a, this.Y); break;
+      case NO.ORA: this.A = this.nz(this.A | this.rd(a)); break;
+      case NO.AND: this.A = this.nz(this.A & this.rd(a)); break;
+      case NO.EOR: this.A = this.nz(this.A ^ this.rd(a)); break;
+      case NO.ADC: this.adc(this.rd(a)); break;
+      case NO.SBC: this.adc(this.rd(a) ^ 0xFF); break;
+      case NO.CMP: this.cmp(this.A, this.rd(a)); break;
+      case NO.CPX: this.cmp(this.X, this.rd(a)); break;
+      case NO.CPY: this.cmp(this.Y, this.rd(a)); break;
+      case NO.BIT: v = this.rd(a); this.P = (this.P & 0x3D) | (v & 0xC0) | ((this.A & v) ? 0 : 2); break;
+      case NO.ASL: case NO.LSR: case NO.ROL: case NO.ROR: case NO.INC: case NO.DEC:
+      case NO.SLO: case NO.RLA: case NO.SRE: case NO.RRA: case NO.DCP: case NO.ISC: {
+        const accm = NES_MODE[op] === 1;
+        v = accm ? this.A : this.rd(a);
+        if (!accm) this.wr(a, v); // dummy write
+        const id = NES_OPID[op];
+        if (id === NO.ASL || id === NO.SLO) { this.P = (this.P & ~1) | (v >> 7); v = (v << 1) & 0xFF; }
+        else if (id === NO.LSR || id === NO.SRE) { this.P = (this.P & ~1) | (v & 1); v >>= 1; }
+        else if (id === NO.ROL || id === NO.RLA) { const c = this.P & 1; this.P = (this.P & ~1) | (v >> 7); v = ((v << 1) | c) & 0xFF; }
+        else if (id === NO.ROR || id === NO.RRA) { const c = this.P & 1; this.P = (this.P & ~1) | (v & 1); v = (v >> 1) | (c << 7); }
+        else if (id === NO.INC || id === NO.ISC) v = (v + 1) & 0xFF;
+        else v = (v - 1) & 0xFF;
+        if (accm) this.A = v; else this.wr(a, v);
+        if (id === NO.SLO) this.A = this.nz(this.A | v);
+        else if (id === NO.RLA) this.A = this.nz(this.A & v);
+        else if (id === NO.SRE) this.A = this.nz(this.A ^ v);
+        else if (id === NO.RRA) this.adc(v);
+        else if (id === NO.DCP) this.cmp(this.A, v);
+        else if (id === NO.ISC) this.adc(v ^ 0xFF);
+        else this.nz(v);
+        break;
+      }
+      case NO.LAX: this.A = this.X = this.nz(this.rd(a)); break;
+      case NO.SAX: this.wr(a, this.A & this.X); break;
+      case NO.ANC: this.A = this.nz(this.A & this.rd(a)); this.P = (this.P & ~1) | (this.A >> 7); break;
+      case NO.ALR: v = this.A & this.rd(a); this.P = (this.P & ~1) | (v & 1); this.A = this.nz(v >> 1); break;
+      case NO.ARR: v = this.A & this.rd(a); this.A = this.nz((v >> 1) | ((this.P & 1) << 7)); this.P = (this.P & ~0x41) | ((this.A >> 6) & 1) | (((this.A >> 6) ^ (this.A >> 5)) & 1 ? 0x40 : 0); break;
+      case NO.AXS: v = (this.A & this.X) - this.rd(a); this.P = (this.P & ~1) | (v >= 0 ? 1 : 0); this.X = this.nz(v); break;
+      case NO.XAA: this.A = this.nz(this.X & this.rd(a)); break;
+      case NO.LAS: v = this.rd(a) & this.S; this.A = this.X = this.S = v; this.nz(v); break;
+      case NO.SHY: case NO.SHX: case NO.AHX: case NO.TAS: {
+        const id = NES_OPID[op], hi = ((t >> 8) + 1) & 0xFF;
+        if (id === NO.TAS) this.S = this.A & this.X;
+        const src = id === NO.SHY ? this.Y : id === NO.SHX ? this.X : id === NO.TAS ? this.S : this.A & this.X;
+        v = src & hi;
+        this.wr(cross ? ((v << 8) | (a & 0xFF)) : a, v); break;
+      }
+      case NO.NOP: if (NES_MODE[op] >= 2) this.rd(a); break;
+      case NO.KIL: break;
+      case NO.TAX: this.X = this.nz(this.A); break;
+      case NO.TAY: this.Y = this.nz(this.A); break;
+      case NO.TXA: this.A = this.nz(this.X); break;
+      case NO.TYA: this.A = this.nz(this.Y); break;
+      case NO.TSX: this.X = this.nz(this.S); break;
+      case NO.TXS: this.S = this.X; break;
+      case NO.INX: this.X = this.nz(this.X + 1); break;
+      case NO.INY: this.Y = this.nz(this.Y + 1); break;
+      case NO.DEX: this.X = this.nz(this.X - 1); break;
+      case NO.DEY: this.Y = this.nz(this.Y - 1); break;
+      case NO.CLC: this.P &= ~1; break;
+      case NO.SEC: this.P |= 1; break;
+      case NO.CLI: this.P &= ~4; break;
+      case NO.SEI: this.P |= 4; break;
+      case NO.CLV: this.P &= ~0x40; break;
+      case NO.CLD: this.P &= ~8; break;
+      case NO.SED: this.P |= 8; break;
+      case NO.PHA: this.push(this.A); break;
+      case NO.PHP: this.push(this.P | 0x30); break;
+      case NO.PLA: this.A = this.nz(this.pull()); break;
+      case NO.PLP: this.P = (this.pull() & 0xEF) | 0x20; break;
+      case NO.BPL: br(!(this.P & 0x80)); break;
+      case NO.BMI: br(this.P & 0x80); break;
+      case NO.BVC: br(!(this.P & 0x40)); break;
+      case NO.BVS: br(this.P & 0x40); break;
+      case NO.BCC: br(!(this.P & 1)); break;
+      case NO.BCS: br(this.P & 1); break;
+      case NO.BNE: br(!(this.P & 2)); break;
+      case NO.BEQ: br(this.P & 2); break;
+      case NO.JMP: this.PC = a; break;
+      case NO.JSR: t = (this.PC - 1) & 0xFFFF; this.push(t >> 8); this.push(t & 0xFF); this.PC = a; break;
+      case NO.RTS: t = this.pull(); t |= this.pull() << 8; this.PC = (t + 1) & 0xFFFF; break;
+      case NO.RTI: this.P = (this.pull() & 0xEF) | 0x20; t = this.pull(); t |= this.pull() << 8; this.PC = t; break;
+      case NO.BRK: this.PC = (this.PC + 1) & 0xFFFF; this.interrupt(0xFFFE, true); break;
+    }
+    return cyc;
+  }
+}
+
+// ---------- mappers ----------
+class NesMapper {
+  constructor(nes) {
+    this.nes = nes; this.prg = nes.prgRom; this.chr = nes.chr; this.chrRam = nes.chrIsRam;
+    this.prgMap = new Int32Array(4); this.chrMap = new Int32Array(8); this.irq = false;
+    this.setPrg16(0, 0); this.setPrg16(1, -1); this.setChr8(0);
+  }
+  wrapPrg(b, size) { const n = (this.prg.length / size) | 0; return ((b % n) + n) % n; }
+  setPrg8(s, b) { this.prgMap[s] = this.wrapPrg(b, 0x2000) * 0x2000; }
+  setPrg16(s, b) { b = this.wrapPrg(b, 0x4000); this.prgMap[s * 2] = b * 0x4000; this.prgMap[s * 2 + 1] = b * 0x4000 + 0x2000; }
+  setPrg32(b) { b = this.wrapPrg(b, 0x8000); for (let i = 0; i < 4; i++) this.prgMap[i] = b * 0x8000 + i * 0x2000; }
+  wrapChr(b, size) { const n = Math.max(1, (this.chr.length / size) | 0); return ((b % n) + n) % n; }
+  setChr1(s, b) { this.chrMap[s] = this.wrapChr(b, 0x400) * 0x400; }
+  setChr2(s, b) { b = this.wrapChr(b, 0x800); this.chrMap[s * 2] = b * 0x800; this.chrMap[s * 2 + 1] = b * 0x800 + 0x400; }
+  setChr4(s, b) { b = this.wrapChr(b, 0x1000); for (let i = 0; i < 4; i++) this.chrMap[s * 4 + i] = b * 0x1000 + i * 0x400; }
+  setChr8(b) { b = this.wrapChr(b, 0x2000); for (let i = 0; i < 8; i++) this.chrMap[i] = b * 0x2000 + i * 0x400; }
+  read(a) {
+    if (a >= 0x8000) return this.prg[this.prgMap[(a >> 13) & 3] + (a & 0x1FFF)];
+    if (a >= 0x6000) return this.nes.prgRam[a - 0x6000];
+    return this.nes.openBus;
+  }
+  write(a, v) {
+    if (a >= 0x6000 && a < 0x8000) { const r = this.nes.prgRam; if (r[a - 0x6000] !== v) { r[a - 0x6000] = v; if (this.nes.battery) this.nes.sramDirty = true; } return; }
+    if (a >= 0x8000) this.reg(a, v);
+  }
+  reg(a, v) { }
+  ppuRead(a) { return this.chr[this.chrMap[a >> 10] + (a & 0x3FF)]; }
+  ppuWrite(a, v) { if (this.chrRam) this.chr[this.chrMap[a >> 10] + (a & 0x3FF)] = v; }
+  scanline() { }
+}
+class Mapper1 extends NesMapper {
+  constructor(n) { super(n); this.shift = 0x10; this.ctrl = 0x0C; this.c0 = 0; this.c1 = 0; this.pr = 0; this.update(); }
+  reg(a, v) {
+    if (v & 0x80) { this.shift = 0x10; this.ctrl |= 0x0C; this.update(); return; }
+    const done = this.shift & 1; this.shift = (this.shift >> 1) | ((v & 1) << 4);
+    if (!done) return;
+    const r = this.shift; this.shift = 0x10;
+    if (a < 0xA000) this.ctrl = r; else if (a < 0xC000) this.c0 = r; else if (a < 0xE000) this.c1 = r; else this.pr = r;
+    this.update();
+  }
+  update() {
+    this.nes.mirror = [2, 3, 1, 0][this.ctrl & 3];
+    const outer = this.prg.length > 0x40000 ? (this.c0 & 0x10) : 0, pb = (this.pr & 15) | outer, pm = (this.ctrl >> 2) & 3;
+    if (pm < 2) { this.setPrg16(0, (pb & ~1)); this.setPrg16(1, pb | 1); }
+    else if (pm === 2) { this.setPrg16(0, outer); this.setPrg16(1, pb); }
+    else { this.setPrg16(0, pb); this.setPrg16(1, outer | 15); }
+    if (this.ctrl & 0x10) { this.setChr4(0, this.c0); this.setChr4(1, this.c1); }
+    else { this.setChr4(0, this.c0 & ~1); this.setChr4(1, this.c0 | 1); }
+  }
+}
+class Mapper2 extends NesMapper { reg(a, v) { this.setPrg16(0, v); } }
+class Mapper3 extends NesMapper { reg(a, v) { this.setChr8(v); } }
+class Mapper4 extends NesMapper {
+  constructor(n) { super(n); this.r = new Uint8Array(8); this.sel = 0; this.latch = 0; this.counter = 0; this.reload = false; this.irqOn = false; this.r[7] = 1; this.r[1] = 2; this.r[2] = 4; this.r[3] = 5; this.r[4] = 6; this.r[5] = 7; this.update(); }
+  reg(a, v) {
+    const even = !(a & 1);
+    if (a < 0xA000) { if (even) this.sel = v; else this.r[this.sel & 7] = v; this.update(); }
+    else if (a < 0xC000) { if (even && this.nes.mirror !== 4) this.nes.mirror = (v & 1) ? 0 : 1; }
+    else if (a < 0xE000) { if (even) this.latch = v; else { this.counter = 0; this.reload = true; } }
+    else { if (even) { this.irqOn = false; this.irq = false; } else this.irqOn = true; }
+  }
+  update() {
+    const r = this.r;
+    if (this.sel & 0x40) { this.setPrg8(0, -2); this.setPrg8(2, r[6]); } else { this.setPrg8(0, r[6]); this.setPrg8(2, -2); }
+    this.setPrg8(1, r[7]); this.setPrg8(3, -1);
+    const inv = (this.sel & 0x80) ? 4 : 0;
+    this.setChr1(inv ^ 0, r[0] & ~1); this.setChr1(inv ^ 1, r[0] | 1); this.setChr1(inv ^ 2, r[1] & ~1); this.setChr1(inv ^ 3, r[1] | 1);
+    this.setChr1(inv ^ 4, r[2]); this.setChr1(inv ^ 5, r[3]); this.setChr1(inv ^ 6, r[4]); this.setChr1(inv ^ 7, r[5]);
+  }
+  scanline() {
+    if (this.counter === 0 || this.reload) { this.counter = this.latch; this.reload = false; } else this.counter--;
+    if (this.counter === 0 && this.irqOn) this.irq = true;
+  }
+}
+class Mapper7 extends NesMapper { constructor(n) { super(n); this.setPrg32(0); this.nes.mirror = 2; } reg(a, v) { this.setPrg32(v & 7); this.nes.mirror = (v & 0x10) ? 3 : 2; } }
+class Mapper9 extends NesMapper {
+  constructor(n) { super(n); this.b = [0, 0, 0, 0]; this.l0 = 1; this.l1 = 1; this.setPrg8(0, 0); this.setPrg8(1, -3); this.setPrg8(2, -2); this.setPrg8(3, -1); this.upd(); }
+  reg(a, v) {
+    if (a >= 0xF000) { this.nes.mirror = (v & 1) ? 0 : 1; return; }
+    if (a < 0xB000) { this.setPrg8(0, v & 15); return; }
+    this.b[(a >> 12) - 0xB] = v & 31; this.upd();
+  }
+  upd() { this.setChr4(0, this.b[this.l0 ? 1 : 0]); this.setChr4(1, this.b[this.l1 ? 3 : 2]); }
+  ppuRead(a) {
+    const v = this.chr[this.chrMap[a >> 10] + (a & 0x3FF)];
+    if (a === 0x0FD8) { this.l0 = 0; this.upd(); } else if (a === 0x0FE8) { this.l0 = 1; this.upd(); }
+    else if (a >= 0x1FD8 && a <= 0x1FDF) { this.l1 = 0; this.upd(); } else if (a >= 0x1FE8 && a <= 0x1FEF) { this.l1 = 1; this.upd(); }
+    return v;
+  }
+}
+class Mapper11 extends NesMapper { constructor(n) { super(n); this.setPrg32(0); } reg(a, v) { this.setPrg32(v & 3); this.setChr8(v >> 4); } }
+class Mapper66 extends NesMapper { constructor(n) { super(n); this.setPrg32(0); } reg(a, v) { this.setPrg32((v >> 4) & 3); this.setChr8(v & 3); } }
+class Mapper71 extends NesMapper { reg(a, v) { if (a >= 0xC000) this.setPrg16(0, v); else if (a >= 0x9000 && a < 0xA000) this.nes.mirror = (v & 0x10) ? 3 : 2; } }
+const NES_MAPPERS = { 0: NesMapper, 1: Mapper1, 2: Mapper2, 3: Mapper3, 4: Mapper4, 7: Mapper7, 9: Mapper9, 11: Mapper11, 66: Mapper66, 71: Mapper71 };
+
+// ---------- PPU ----------
+class NesPPU {
+  constructor(nes) {
+    this.nes = nes; this.vram = new Uint8Array(0x1000); this.pal = new Uint8Array(32); this.oam = new Uint8Array(256);
+    this.bgBuf = new Uint8Array(264); this.spBuf = new Uint8Array(256); this.spPri = new Uint8Array(256); this.spZero = new Uint8Array(256);
+    this.reset();
+  }
+  reset() {
+    this.ctrl = 0; this.mask = 0; this.status = 0; this.oamAddr = 0; this.v = 0; this.t = 0; this.x = 0; this.w = 0; this.buf = 0;
+    this.line = 0; this.dot = 0; this.frameDone = false; this.s0dot = -1; this.odd = 0; this.a12s = 0;
+  }
+  ntAddr(a) {
+    const tb = (a >> 10) & 3; let p;
+    switch (this.nes.mirror) { case 0: p = tb >> 1; break; case 1: p = tb & 1; break; case 2: p = 0; break; case 3: p = 1; break; default: p = tb; }
+    return (p << 10) | (a & 0x3FF);
+  }
+  palIdx(a) { a &= 0x1F; if ((a & 0x13) === 0x10) a &= 0x0F; return a; }
+  vread(a) {
+    a &= 0x3FFF;
+    if (a < 0x2000) return this.nes.mapper.ppuRead(a);
+    if (a < 0x3F00) return this.vram[this.ntAddr(a)];
+    return this.pal[this.palIdx(a)];
+  }
+  vwrite(a, v) {
+    a &= 0x3FFF;
+    if (a < 0x2000) this.nes.mapper.ppuWrite(a, v);
+    else if (a < 0x3F00) this.vram[this.ntAddr(a)] = v;
+    else this.pal[this.palIdx(a)] = v & 0x3F;
+  }
+  readReg(r) {
+    const nes = this.nes;
+    switch (r) {
+      case 2: { const v = (this.status & 0xE0) | (nes.openBus & 0x1F); this.status &= 0x7F; this.w = 0; return v; }
+      case 4: return this.oam[this.oamAddr];
+      case 7: {
+        const a = this.v & 0x3FFF; let r2; this.a12(a);
+        if (a >= 0x3F00) { r2 = (this.vread(a) & 0x3F) | (nes.openBus & 0xC0); this.buf = this.vread(a - 0x1000); }
+        else { r2 = this.buf; this.buf = this.vread(a); }
+        this.v = (this.v + ((this.ctrl & 4) ? 32 : 1)) & 0x7FFF;
+        return r2;
+      }
+    }
+    return nes.openBus;
+  }
+  writeReg(r, val) {
+    switch (r) {
+      case 0: {
+        const was = this.ctrl & 0x80; this.ctrl = val; this.t = (this.t & 0xF3FF) | ((val & 3) << 10);
+        if (!was && (val & 0x80) && (this.status & 0x80)) this.nes.cpu.nmiPending = true;
+        break;
+      }
+      case 1: this.mask = val; break;
+      case 3: this.oamAddr = val; break;
+      case 4: this.oam[this.oamAddr] = val; this.oamAddr = (this.oamAddr + 1) & 0xFF; break;
+      case 5:
+        if (!this.w) { this.t = (this.t & 0xFFE0) | (val >> 3); this.x = val & 7; this.w = 1; }
+        else { this.t = (this.t & 0x8C1F) | ((val & 7) << 12) | ((val & 0xF8) << 2); this.w = 0; }
+        break;
+      case 6:
+        if (!this.w) { this.t = (this.t & 0x00FF) | ((val & 0x3F) << 8); this.w = 1; }
+        else { this.t = (this.t & 0xFF00) | val; this.v = this.t; this.w = 0; this.a12(this.v); }
+        break;
+      case 7: this.a12(this.v); this.vwrite(this.v, val); this.v = (this.v + ((this.ctrl & 4) ? 32 : 1)) & 0x7FFF; break;
+    }
+  }
+  a12(addr) { const h = (addr & 0x1000) ? 1 : 0; if (h && !this.a12s) this.nes.mapper.scanline(); this.a12s = h; }
+  incY() {
+    let v = this.v;
+    if ((v & 0x7000) !== 0x7000) v += 0x1000;
+    else {
+      v &= ~0x7000; let y = (v & 0x3E0) >> 5;
+      if (y === 29) { y = 0; v ^= 0x800; } else if (y === 31) y = 0; else y++;
+      v = (v & ~0x3E0) | (y << 5);
+    }
+    this.v = v;
+  }
+  a12Render(d) {
+    const bgHi = this.ctrl & 0x10, spHi = (this.ctrl & 0x20) || (this.ctrl & 0x08);
+    if (d === 260) { if (spHi && !bgHi) this.nes.mapper.scanline(); this.a12s = spHi ? 1 : 0; }
+    else { if (bgHi && !spHi) this.nes.mapper.scanline(); this.a12s = bgHi ? 1 : 0; }
+  }
+  step(n) {
+    while (n-- > 0) {
+      if (++this.dot > 340) {
+        this.dot = 0;
+        if (++this.line > 261) { this.line = 0; this.odd ^= 1; }
+      }
+      const L = this.line, d = this.dot, ren = this.mask & 0x18;
+      if (L < 240) {
+        if (d === 1) this.renderLine(L);
+        else if (d === this.s0dot) this.status |= 0x40;
+        if (ren) {
+          if (d === 256) this.incY();
+          else if (d === 257) this.v = (this.v & ~0x041F) | (this.t & 0x041F);
+          else if (d === 260 || d === 324) this.a12Render(d);
+        }
+      } else if (L === 241) {
+        if (d === 1) {
+          this.status |= 0x80; this.frameDone = true;
+          if (this.ctrl & 0x80) this.nes.cpu.nmiPending = true;
+        }
+      } else if (L === 261) {
+        if (d === 1) this.status &= 0x1F;
+        if (ren) {
+          if (d === 257) this.v = (this.v & ~0x041F) | (this.t & 0x041F);
+          else if (d >= 280 && d <= 304) this.v = (this.v & ~0x7BE0) | (this.t & 0x7BE0);
+          else if (d === 260 || d === 324) this.a12Render(d);
+          else if (d === 339 && this.odd) this.dot = 340;
+        }
+      }
+    }
+  }
+  renderLine(L) {
+    const bg = this.bgBuf, sp = this.spBuf, out = this.nes.image;
+    const showBg = this.mask & 8, showSp = this.mask & 16;
+    this.s0dot = -1;
+    const visible = L >= 8 && L < 232, row = (L - 8) * 256;
+    const lut = NES_LUT, eo = ((this.mask >> 5) & 7) * 64, gm = (this.mask & 1) ? 0x30 : 0x3F;
+    if (!showBg && !showSp) {
+      if (visible) { const c = lut[eo + (this.pal[0] & gm)]; out.fill(c, row, row + 256); }
+      return;
+    }
+    // background
+    if (showBg) {
+      let v = this.v; const fx = this.x, base = (this.ctrl & 0x10) ? 0x1000 : 0;
+      for (let tile = 0; tile < 33; tile++) {
+        const nt = this.vram[this.ntAddr(0x2000 | (v & 0x0FFF))];
+        const at = this.vram[this.ntAddr(0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 7))];
+        const pal = ((at >> (((v >> 4) & 4) | (v & 2))) & 3) << 2;
+        const pa = base + nt * 16 + ((v >> 12) & 7);
+        const lo = this.vread(pa), hi = this.vread(pa + 8);
+        const x0 = tile * 8 - fx;
+        for (let b = 0; b < 8; b++) {
+          const px = x0 + b; if (px < 0 || px > 255) continue;
+          const p = ((lo >> (7 - b)) & 1) | (((hi >> (7 - b)) & 1) << 1);
+          bg[px] = p ? (pal | p) : 0;
+        }
+        if ((v & 0x1F) === 31) { v &= ~0x1F; v ^= 0x400; } else v++;
+      }
+      if (!(this.mask & 2)) for (let i = 0; i < 8; i++) bg[i] = 0;
+    } else bg.fill(0, 0, 256);
+    // sprites
+    sp.fill(0);
+    if (showSp) {
+      const h = (this.ctrl & 0x20) ? 16 : 8, oam = this.oam; let count = 0;
+      for (let i = 0; i < 64; i++) {
+        const y = oam[i * 4], r0 = L - 1 - y;
+        if (r0 < 0 || r0 >= h) continue;
+        if (++count > 8) { this.status |= 0x20; break; }
+        const tileI = oam[i * 4 + 1], attr = oam[i * 4 + 2], sx = oam[i * 4 + 3];
+        let r = (attr & 0x80) ? h - 1 - r0 : r0, pa;
+        if (h === 16) pa = ((tileI & 1) << 12) + ((tileI & 0xFE) + (r >> 3)) * 16 + (r & 7);
+        else pa = ((this.ctrl & 8) ? 0x1000 : 0) + tileI * 16 + r;
+        const lo = this.vread(pa), hi = this.vread(pa + 8), pal = 0x10 | ((attr & 3) << 2);
+        for (let b = 0; b < 8; b++) {
+          const px = sx + b; if (px > 255) break;
+          if (sp[px]) continue;
+          const bit = (attr & 0x40) ? b : 7 - b;
+          const p = ((lo >> bit) & 1) | (((hi >> bit) & 1) << 1);
+          if (!p) continue;
+          if (px < 8 && !(this.mask & 4)) continue;
+          sp[px] = pal | p; this.spPri[px] = attr & 0x20;
+          if (i === 0 && showBg && bg[px] && px < 255 && this.s0dot < 0 && !(this.status & 0x40)) this.s0dot = px + 2;
+        }
+      }
+    }
+    if (!visible) return;
+    const pal = this.pal;
+    for (let x = 0; x < 256; x++) {
+      const b = bg[x], s = sp[x];
+      let i;
+      if (s && (!b || !this.spPri[x])) i = s; else if (b) i = b; else i = 0;
+      out[row + x] = lut[eo + (pal[i] & gm)];
+    }
+  }
+}
+
+// ---------- APU ----------
+const NES_LEN = [10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30];
+const NES_DUTY = [[0, 1, 0, 0, 0, 0, 0, 0], [0, 1, 1, 0, 0, 0, 0, 0], [0, 1, 1, 1, 1, 0, 0, 0], [1, 0, 0, 1, 1, 1, 1, 1]];
+const NES_TRI = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+const NES_NOISE = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068];
+const NES_DMC = [428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54];
+const NES_PULSE_MIX = Array.from({ length: 31 }, (_, i) => i ? 95.52 / (8128 / i + 100) : 0);
+const NES_TND_MIX = Array.from({ length: 203 }, (_, i) => i ? 163.67 / (24329 / i + 100) : 0);
+class NesAPU {
+  constructor(nes) {
+    this.nes = nes; this.bufSize = 16384; this.outL = new Float32Array(this.bufSize); this.outR = this.outL; this.wpos = 0; this.rpos = 0; this.rate = 44100;
+    this.reset();
+  }
+  reset() {
+    const ch = () => ({ en: 0, len: 0, halt: 0, cvol: 0, vol: 0, estart: 0, ediv: 0, edec: 0, timer: 0, per: 0, seq: 0, duty: 0, swEn: 0, swPer: 0, swNeg: 0, swSh: 0, swDiv: 0, swRel: 0 });
+    this.p1 = ch(); this.p2 = ch(); this.tri = ch(); this.noi = ch();
+    this.tri.lin = 0; this.tri.linRel = 0; this.tri.linCtl = 0; this.noi.mode = 0; this.noi.shift = 1;
+    this.dmc = { en: 0, irqEn: 0, loop: 0, rate: 428, timer: 428, out: 0, addr: 0xC000, len: 0, cur: 0, rem: 0, buf: 0, bufFull: 0, sh: 0, bits: 8, silent: 1 };
+    this.frameCyc = 0; this.mode5 = 0; this.irqInhibit = 0; this.frameIrq = false; this.dmcIrq = false; this.odd = 0;
+    this.acc = 0; this.accN = 0; this.sampT = 0; this.hp = 0; this.hpPrev = 0;
+  }
+  write(a, v) {
+    const p = a < 0x4004 ? this.p1 : this.p2;
+    switch (a) {
+      case 0x4000: case 0x4004: p.duty = v >> 6; p.halt = (v >> 5) & 1; p.cvol = (v >> 4) & 1; p.vol = v & 15; break;
+      case 0x4001: case 0x4005: p.swEn = v >> 7; p.swPer = (v >> 4) & 7; p.swNeg = (v >> 3) & 1; p.swSh = v & 7; p.swRel = 1; break;
+      case 0x4002: case 0x4006: p.per = (p.per & 0x700) | v; break;
+      case 0x4003: case 0x4007: p.per = (p.per & 0xFF) | ((v & 7) << 8); if (p.en) p.len = NES_LEN[v >> 3]; p.seq = 0; p.estart = 1; break;
+      case 0x4008: this.tri.halt = this.tri.linCtl = v >> 7; this.tri.linRel = v & 0x7F; break;
+      case 0x400A: this.tri.per = (this.tri.per & 0x700) | v; break;
+      case 0x400B: this.tri.per = (this.tri.per & 0xFF) | ((v & 7) << 8); if (this.tri.en) this.tri.len = NES_LEN[v >> 3]; this.tri.linReload = 1; break;
+      case 0x400C: this.noi.halt = (v >> 5) & 1; this.noi.cvol = (v >> 4) & 1; this.noi.vol = v & 15; break;
+      case 0x400E: this.noi.mode = v >> 7; this.noi.per = NES_NOISE[v & 15]; break;
+      case 0x400F: if (this.noi.en) this.noi.len = NES_LEN[v >> 3]; this.noi.estart = 1; break;
+      case 0x4010: this.dmc.irqEn = v >> 7; this.dmc.loop = (v >> 6) & 1; this.dmc.rate = NES_DMC[v & 15]; if (!this.dmc.irqEn) this.dmcIrq = false; break;
+      case 0x4011: this.dmc.out = v & 0x7F; break;
+      case 0x4012: this.dmc.addr = 0xC000 + v * 64; break;
+      case 0x4013: this.dmc.len = v * 16 + 1; break;
+      case 0x4015:
+        this.p1.en = v & 1; this.p2.en = (v >> 1) & 1; this.tri.en = (v >> 2) & 1; this.noi.en = (v >> 3) & 1;
+        if (!this.p1.en) this.p1.len = 0; if (!this.p2.en) this.p2.len = 0; if (!this.tri.en) this.tri.len = 0; if (!this.noi.en) this.noi.len = 0;
+        this.dmcIrq = false;
+        if (v & 0x10) { if (!this.dmc.rem) { this.dmc.cur = this.dmc.addr; this.dmc.rem = this.dmc.len; } } else this.dmc.rem = 0;
+        break;
+      case 0x4017:
+        this.mode5 = v >> 7; this.irqInhibit = (v >> 6) & 1; if (this.irqInhibit) this.frameIrq = false;
+        this.frameCyc = 0; if (this.mode5) { this.quarter(); this.half(); }
+        break;
+    }
+  }
+  status() {
+    const v = (this.p1.len ? 1 : 0) | (this.p2.len ? 2 : 0) | (this.tri.len ? 4 : 0) | (this.noi.len ? 8 : 0) | (this.dmc.rem ? 16 : 0) | (this.frameIrq ? 0x40 : 0) | (this.dmcIrq ? 0x80 : 0);
+    this.frameIrq = false; return v;
+  }
+  env(c) {
+    if (c.estart) { c.estart = 0; c.edec = 15; c.ediv = c.vol; }
+    else if (c.ediv === 0) { c.ediv = c.vol; if (c.edec) c.edec--; else if (c.halt) c.edec = 15; }
+    else c.ediv--;
+  }
+  swTarget(c, ones) { const ch = c.per >> c.swSh; return c.swNeg ? c.per - ch - ones : c.per + ch; }
+  sweep(c, ones) {
+    const tgt = this.swTarget(c, ones);
+    if (c.swDiv === 0 && c.swEn && c.swSh && c.per >= 8 && tgt <= 0x7FF) c.per = tgt;
+    if (c.swDiv === 0 || c.swRel) { c.swDiv = c.swPer; c.swRel = 0; } else c.swDiv--;
+  }
+  quarter() {
+    this.env(this.p1); this.env(this.p2); this.env(this.noi);
+    const t = this.tri; if (t.linReload) t.lin = t.linRel; else if (t.lin) t.lin--; if (!t.linCtl) t.linReload = 0;
+  }
+  half() {
+    for (const c of [this.p1, this.p2, this.tri, this.noi]) if (c.len && !c.halt) c.len--;
+    this.sweep(this.p1, 1); this.sweep(this.p2, 0);
+  }
+  pulseOut(c) {
+    if (!c.len || c.per < 8 || this.swTarget(c, c === this.p1 ? 1 : 0) > 0x7FF || !NES_DUTY[c.duty][c.seq]) return 0;
+    return c.cvol ? c.vol : c.edec;
+  }
+  run(cycles) {
+    const p1 = this.p1, p2 = this.p2, tri = this.tri, noi = this.noi, dmc = this.dmc;
+    for (let i = 0; i < cycles; i++) {
+      const fc = ++this.frameCyc;
+      if (fc === 7457) this.quarter();
+      else if (fc === 14913) { this.quarter(); this.half(); }
+      else if (fc === 22371) this.quarter();
+      else if (!this.mode5 && fc === 29829) { this.quarter(); this.half(); if (!this.irqInhibit) this.frameIrq = true; }
+      else if (!this.mode5 && fc >= 29830) this.frameCyc = 0;
+      else if (this.mode5 && fc === 37281) { this.quarter(); this.half(); }
+      else if (this.mode5 && fc >= 37282) this.frameCyc = 0;
+      // triangle
+      if (--tri.timer < 0) { tri.timer = tri.per; if (tri.len && tri.lin && tri.per > 1) tri.seq = (tri.seq + 1) & 31; }
+      if ((this.odd ^= 1)) {
+        if (--p1.timer < 0) { p1.timer = p1.per; p1.seq = (p1.seq + 7) & 7; }
+        if (--p2.timer < 0) { p2.timer = p2.per; p2.seq = (p2.seq + 7) & 7; }
+        if (--noi.timer < 0) {
+          noi.timer = (noi.per >> 1) - 1;
+          const fb = (noi.shift & 1) ^ ((noi.shift >> (noi.mode ? 6 : 1)) & 1);
+          noi.shift = (noi.shift >> 1) | (fb << 14);
+        }
+      }
+      // DMC
+      if (--dmc.timer <= 0) {
+        dmc.timer = dmc.rate;
+        if (!dmc.silent) {
+          if (dmc.sh & 1) { if (dmc.out <= 125) dmc.out += 2; } else if (dmc.out >= 2) dmc.out -= 2;
+        }
+        dmc.sh >>= 1;
+        if (--dmc.bits <= 0) {
+          dmc.bits = 8;
+          if (dmc.bufFull) { dmc.silent = 0; dmc.sh = dmc.buf; dmc.bufFull = 0; } else dmc.silent = 1;
+        }
+      }
+      if (!dmc.bufFull && dmc.rem) {
+        dmc.buf = this.nes.read(dmc.cur); dmc.bufFull = 1;
+        dmc.cur = dmc.cur === 0xFFFF ? 0x8000 : dmc.cur + 1;
+        if (--dmc.rem === 0) { if (dmc.loop) { dmc.cur = dmc.addr; dmc.rem = dmc.len; } else if (dmc.irqEn) this.dmcIrq = true; }
+      }
+      // mix
+      const po = this.pulseOut(p1) + this.pulseOut(p2);
+      const to = NES_TRI[tri.seq], no = (noi.len && !(noi.shift & 1)) ? (noi.cvol ? noi.vol : noi.edec) : 0;
+      this.acc += NES_PULSE_MIX[po] + NES_TND_MIX[3 * to + 2 * no + dmc.out]; this.accN++;
+      this.sampT += 44100;
+      if (this.sampT >= 1789773) {
+        this.sampT -= 1789773;
+        const s = this.acc / this.accN; this.acc = 0; this.accN = 0;
+        const y = s - this.hpPrev + 0.996 * this.hp; this.hpPrev = s; this.hp = y;
+        const np = (this.wpos + 1) % this.bufSize;
+        if (np !== this.rpos) { this.outL[this.wpos] = y * 1.6; this.wpos = np; }
+      }
+    }
+  }
+}
+
+// ---------- system ----------
+class NES {
+  constructor() {
+    this.system = 'nes'; this.width = 256; this.height = 224; this.fps = 60.0988;
+    this.ram = new Uint8Array(0x800); this.prgRam = new Uint8Array(0x2000); this.image = new Uint32Array(256 * 224);
+    this.pad = [0, 0]; this.sram = new Uint8Array(0); this.sramDirty = false; this.openBus = 0;
+    this.cpu = new NesCPU(this); this.ppu = new NesPPU(this); this.apu = new NesAPU(this);
+    this.joy = [0, 0]; this.strobe = 0;
+  }
+  get audio() { return this.apu; }
+  get label() { return 'FC · MAPPER ' + this.mapperId; }
+  loadROM(d, name) {
+    if (!(d[0] === 0x4E && d[1] === 0x45 && d[2] === 0x53 && d[3] === 0x1A)) throw new Error('ファミコンのROM（iNES形式）ではありません');
+    this.rom = d;
+    const prgN = d[4], chrN = d[5], f6 = d[6], f7 = d[7];
+    const nes2 = (f7 & 0x0C) === 0x08, junk = !nes2 && (d[12] | d[13] | d[14] | d[15]);
+    this.mapperId = (f6 >> 4) | (junk ? 0 : (f7 & 0xF0));
+    if (!NES_MAPPERS[this.mapperId]) throw new Error('未対応のマッパー（' + this.mapperId + '番）です');
+    let off = 16 + ((f6 & 4) ? 512 : 0);
+    this.prgRom = d.slice(off, off + prgN * 0x4000); off += prgN * 0x4000;
+    if (this.prgRom.length < 0x4000) throw new Error('ROMデータが途中で切れています');
+    this.chrIsRam = chrN === 0;
+    this.chr = this.chrIsRam ? new Uint8Array(0x2000) : d.slice(off, off + chrN * 0x2000);
+    this.mirror = (f6 & 8) ? 4 : (f6 & 1) ? 1 : 0;
+    this.battery = !!(f6 & 2);
+    this.sram = this.battery ? this.prgRam : new Uint8Array(0);
+    this.title = (name || 'FAMICOM').replace(/\.[^.]+$/, '').slice(0, 40);
+    this.reset();
+  }
+  reset() {
+    this.ram.fill(0); if (!this.battery) this.prgRam.fill(0);
+    if (this.chrIsRam) this.chr.fill(0);
+    const f6 = this.rom[6]; this.mirror = (f6 & 8) ? 4 : (f6 & 1) ? 1 : 0;
+    this.mapper = new NES_MAPPERS[this.mapperId](this);
+    this.ppu.reset(); this.apu.reset();
+    this.cpu.A = this.cpu.X = this.cpu.Y = 0; this.cpu.S = 0x00; this.cpu.P = 0x24;
+    this.cpu.reset();
+    this.cycle = 0; this.synced = 0; this.instrStart = 0; this.extra = 0;
+  }
+  syncPPU() {
+    const target = this.instrStart + this.cpu.acc;
+    if (target > this.synced) { this.ppu.step((target - this.synced) * 3); this.synced = target; }
+  }
+  read(a) {
+    let v;
+    if (a < 0x2000) v = this.ram[a & 0x7FF];
+    else if (a < 0x4000) { this.syncPPU(); v = this.ppu.readReg(a & 7); }
+    else if (a < 0x4020) {
+      if (a === 0x4015) v = this.apu.status();
+      else if (a === 0x4016 || a === 0x4017) {
+        const p = a & 1;
+        if (this.strobe) this.joy[p] = this.padByte(p);
+        v = (this.joy[p] & 1) | (this.openBus & 0xE0); this.joy[p] = (this.joy[p] >> 1) | 0x80;
+      } else v = this.openBus;
+    } else v = this.mapper.read(a);
+    return this.openBus = v;
+  }
+  write(a, v) {
+    this.openBus = v;
+    if (a < 0x2000) this.ram[a & 0x7FF] = v;
+    else if (a < 0x4000) { this.syncPPU(); this.ppu.writeReg(a & 7, v); }
+    else if (a < 0x4020) {
+      if (a === 0x4014) {
+        const base = v << 8, ppu = this.ppu;
+        for (let i = 0; i < 256; i++) { ppu.oam[ppu.oamAddr] = this.read(base | i); ppu.oamAddr = (ppu.oamAddr + 1) & 0xFF; }
+        this.extra += 513 + ((this.instrStart + this.cpu.acc) & 1);
+      } else if (a === 0x4016) {
+        this.strobe = v & 1;
+        if (this.strobe) { this.joy[0] = this.padByte(0); this.joy[1] = this.padByte(1); }
+      } else this.apu.write(a, v);
+    } else this.mapper.write(a, v);
+  }
+  padByte(p) {
+    const s = this.pad[p] || 0;
+    return ((s & 0x80) || (s & 0x40) ? 1 : 0) | ((s & 0x8000) || (s & 0x4000) ? 2 : 0) | (s & 0x2000 ? 4 : 0) | (s & 0x1000 ? 8 : 0) |
+      (s & 0x800 ? 16 : 0) | (s & 0x400 ? 32 : 0) | (s & 0x200 ? 64 : 0) | (s & 0x100 ? 128 : 0);
+  }
+  runFrame() {
+    const cpu = this.cpu, ppu = this.ppu;
+    ppu.frameDone = false;
+    let guard = 0;
+    while (!ppu.frameDone && guard++ < 200000) {
+      cpu.irqLine = this.apu.frameIrq || this.apu.dmcIrq || this.mapper.irq;
+      this.instrStart = this.cycle; this.extra = 0;
+      const c = cpu.step() + this.extra;
+      this.cycle += c;
+      if (this.cycle > this.synced) { ppu.step((this.cycle - this.synced) * 3); this.synced = this.cycle; }
+      this.apu.run(c);
+    }
+    // keep counters small
+    this.cycle -= this.synced; this.synced = 0;
+  }
+  saveState() {
+    return {
+      v: 1, title: this.title, romLen: this.rom.length,
+      sys: snapObj(this, ['rom', 'prgRom', 'chr', 'image', 'cpu', 'ppu', 'apu', 'mapper', 'pad', 'sramDirty', 'sram', 'joy']),
+      chr: this.chrIsRam ? this.chr.slice() : null, joy: this.joy.slice(),
+      cpu: snapObj(this.cpu, ['nes']), ppu: snapObj(this.ppu, ['nes', 'bgBuf', 'spBuf', 'spPri', 'spZero']),
+      apu: snapObj(this.apu, ['nes', 'outL', 'outR', 'wpos', 'rpos', 'bufSize']),
+      ch: ['p1', 'p2', 'tri', 'noi', 'dmc'].map(k => Object.assign({}, this.apu[k])),
+      mapper: snapObj(this.mapper, ['nes', 'prg', 'chr']),
+    };
+  }
+  loadState(st) {
+    if (!st || st.title !== this.title || st.romLen !== this.rom.length) throw new Error('このソフトのセーブデータではありません');
+    restoreObj(this, st.sys);
+    if (st.chr) this.chr.set(st.chr);
+    this.joy = st.joy.slice();
+    restoreObj(this.cpu, st.cpu); restoreObj(this.ppu, st.ppu); restoreObj(this.apu, st.apu);
+    ['p1', 'p2', 'tri', 'noi', 'dmc'].forEach((k, i) => Object.assign(this.apu[k], st.ch[i]));
+    restoreObj(this.mapper, st.mapper);
+    this.apu.rpos = this.apu.wpos;
+  }
+}
+// ===== Game Boy / Game Boy Color =====
+const GB_CYC = [
+  4, 12, 8, 8, 4, 4, 8, 4, 20, 8, 8, 8, 4, 4, 8, 4, 4, 12, 8, 8, 4, 4, 8, 4, 12, 8, 8, 8, 4, 4, 8, 4,
+  8, 12, 8, 8, 4, 4, 8, 4, 8, 8, 8, 8, 4, 4, 8, 4, 8, 12, 8, 8, 12, 12, 12, 4, 8, 8, 8, 8, 4, 4, 8, 4,
+  4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
+  4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4, 8, 8, 8, 8, 8, 8, 4, 8, 4, 4, 4, 4, 4, 4, 8, 4,
+  4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
+  4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
+  8, 12, 12, 16, 12, 16, 8, 16, 8, 16, 12, 4, 12, 24, 8, 16, 8, 12, 12, 4, 12, 16, 8, 16, 8, 16, 12, 4, 12, 4, 8, 16,
+  12, 12, 8, 4, 4, 16, 8, 16, 16, 4, 16, 4, 4, 4, 8, 16, 12, 12, 8, 4, 4, 16, 8, 16, 12, 8, 16, 4, 4, 4, 8, 16];
+const GB_TIMER_BIT = [512, 8, 32, 128];
+const GB_DMG = [0xE0F8D0, 0x88C070, 0x346856, 0x081820].map(c => 0xFF000000 | ((c & 255) << 16) | (c & 0xFF00) | (c >> 16));
+const GB_CGB_LUT = (() => {
+  const t = new Uint32Array(32768);
+  for (let c = 0; c < 32768; c++) {
+    const r = c & 31, g = (c >> 5) & 31, b = (c >> 10) & 31;
+    const R = Math.min(255, (r * 13 + g * 2 + b) >> 1), G = Math.min(255, (g * 3 + b) << 1), B = Math.min(255, (r * 3 + g * 2 + b * 11) >> 1);
+    t[c] = 0xFF000000 | (B << 16) | (G << 8) | R;
+  }
+  return t;
+})();
+
+class GbAPU {
+  constructor(gb) {
+    this.gb = gb; this.bufSize = 16384; this.outL = new Float32Array(this.bufSize); this.outR = new Float32Array(this.bufSize);
+    this.wpos = 0; this.rpos = 0; this.rate = 44100; this.r = new Uint8Array(0x30); this.reset();
+  }
+  reset() {
+    const ch = () => ({ on: 0, len: 0, lenEn: 0, duty: 0, pos: 0, timer: 0, freq: 0, vol: 0, envDir: 0, envPer: 0, envT: 0, swPer: 0, swNeg: 0, swSh: 0, swT: 0, swEn: 0, shadow: 0, lfsr: 0x7FFF, w7: 0, per: 8, sample: 0 });
+    this.c1 = ch(); this.c2 = ch(); this.c3 = ch(); this.c4 = ch();
+    this.r.fill(0); this.power = 1; this.fsT = 0; this.fsStep = 0;
+    this.accL = 0; this.accR = 0; this.accN = 0; this.sampT = 0; this.hpL = 0; this.hpR = 0; this.pL = 0; this.pR = 0;
+    this.r[0x14] = 0x77; this.r[0x15] = 0xF3; this.r[0x16] = 0x80;
+  }
+  dac(i) { return i === 2 ? (this.r[0x0A] & 0x80) : (this.r[[2, 7, 0, 0x11][i]] & 0xF8); }
+  read(a) {
+    const i = a - 0xFF10;
+    if (i === 0x16) return 0x70 | (this.power ? 0x80 : 0) | (this.c1.on ? 1 : 0) | (this.c2.on ? 2 : 0) | (this.c3.on ? 4 : 0) | (this.c4.on ? 8 : 0);
+    if (i >= 0x20) return this.r[i];
+    const M = [0x80, 0x3F, 0x00, 0xFF, 0xBF, 0xFF, 0x3F, 0x00, 0xFF, 0xBF, 0x7F, 0xFF, 0x9F, 0xFF, 0xBF, 0xFF, 0xFF, 0x00, 0x00, 0xBF, 0x00, 0x00];
+    return i < M.length ? (this.r[i] | M[i]) : 0xFF;
+  }
+  write(a, v) {
+    const i = a - 0xFF10;
+    if (i >= 0x20) { this.r[i] = v; return; }
+    if (i === 0x16) {
+      const on = v & 0x80;
+      if (!on && this.power) { for (let k = 0; k < 0x16; k++) this.r[k] = 0; for (const c of [this.c1, this.c2, this.c3, this.c4]) { c.on = 0; c.freq = 0; c.duty = 0; c.lenEn = 0; c.vol = 0; c.swPer = c.swNeg = c.swSh = 0; c.per = 8; c.w7 = 0; } }
+      if (on && !this.power) this.fsStep = 0;
+      this.power = on ? 1 : 0; return;
+    }
+    if (!this.power) {
+      if (i === 1) this.c1.len = 64 - (v & 63); else if (i === 6) this.c2.len = 64 - (v & 63);
+      else if (i === 0x0B) this.c3.len = 256 - v; else if (i === 0x10) this.c4.len = 64 - (v & 63);
+      return;
+    }
+    this.r[i] = v;
+    const c = i < 5 ? this.c1 : i < 10 ? this.c2 : i < 15 ? this.c3 : this.c4, k = i < 5 ? i : i < 10 ? i - 5 : i < 15 ? i - 10 : i - 15;
+    const n = i < 5 ? 0 : i < 10 ? 1 : i < 15 ? 2 : 3;
+    if (n === 2) {
+      if (k === 0) { if (!(v & 0x80)) c.on = 0; }
+      else if (k === 1) c.len = 256 - v;
+      else if (k === 3) c.freq = (c.freq & 0x700) | v;
+      else if (k === 4) { c.freq = (c.freq & 0xFF) | ((v & 7) << 8); this.lenWrite(c, v, 2); }
+      return;
+    }
+    if (k === 0 && n === 0) { c.swPer = (v >> 4) & 7; c.swNeg = (v >> 3) & 1; c.swSh = v & 7; }
+    else if (k === 1) { if (n !== 3) c.duty = v >> 6; c.len = 64 - (v & 63); }
+    else if (k === 2) { if (!(v & 0xF8)) c.on = 0; }
+    else if (k === 3) { if (n === 3) { const d = v & 7; c.per = (d ? d * 16 : 8) << (v >> 4); c.w7 = (v >> 3) & 1; } else c.freq = (c.freq & 0x700) | v; }
+    else if (k === 4) { if (n !== 3) c.freq = (c.freq & 0xFF) | ((v & 7) << 8); this.lenWrite(c, v, n); }
+  }
+  lenWrite(c, v, n) {
+    const wasEn = c.lenEn, extra = this.fsStep & 1;
+    c.lenEn = (v >> 6) & 1;
+    if (extra && !wasEn && c.lenEn && c.len > 0) { if (--c.len === 0 && !(v & 0x80)) c.on = 0; }
+    if (v & 0x80) { this.trigger(n); }
+  }
+  trigger(n) {
+    const c = [this.c1, this.c2, this.c3, this.c4][n];
+    c.on = this.dac(n) ? 1 : 0;
+    if (c.len === 0) { c.len = n === 2 ? 256 : 64; if (c.lenEn && (this.fsStep & 1)) c.len--; }
+    if (n === 2) { c.timer = (2048 - c.freq) * 2; c.pos = 0; return; }
+    const e = this.r[[2, 7, 0, 0x11][n]];
+    c.vol = e >> 4; c.envDir = (e >> 3) & 1; c.envPer = e & 7; c.envT = c.envPer || 8;
+    if (n === 3) { c.lfsr = 0x7FFF; c.timer = c.per; return; }
+    c.timer = (2048 - c.freq) * 4;
+    if (n === 0) {
+      c.shadow = c.freq; c.swT = c.swPer || 8; c.swEn = (c.swPer || c.swSh) ? 1 : 0;
+      if (c.swSh) this.sweepCalc(c);
+    }
+  }
+  sweepCalc(c) {
+    const d = c.shadow >> c.swSh, nf = c.swNeg ? c.shadow - d : c.shadow + d;
+    if (nf > 2047) c.on = 0;
+    return nf;
+  }
+  frameSeq() {
+    const s = this.fsStep; this.fsStep = (s + 1) & 7;
+    if (!(s & 1)) for (const c of [this.c1, this.c2, this.c3, this.c4]) if (c.lenEn && c.len > 0 && --c.len === 0) c.on = 0;
+    if (s === 2 || s === 6) {
+      const c = this.c1;
+      if (--c.swT <= 0) {
+        c.swT = c.swPer || 8;
+        if (c.swEn && c.swPer) {
+          const nf = this.sweepCalc(c);
+          if (nf <= 2047 && c.swSh) { c.freq = c.shadow = nf; this.r[3] = nf & 0xFF; this.r[4] = (this.r[4] & 0xF8) | (nf >> 8); this.sweepCalc(c); }
+        }
+      }
+    }
+    if (s === 7) for (const c of [this.c1, this.c2, this.c4]) {
+      if (!c.envPer) continue;
+      if (--c.envT <= 0) { c.envT = c.envPer; if (c.envDir && c.vol < 15) c.vol++; else if (!c.envDir && c.vol > 0) c.vol--; }
+    }
+  }
+  tick(d) {
+    const D = [0x01, 0x81, 0x87, 0x7E];
+    let o1 = 0, o2 = 0, o3 = 0, o4 = 0;
+    const c1 = this.c1, c2 = this.c2, c3 = this.c3, c4 = this.c4;
+    if (c1.on) { c1.timer -= d; while (c1.timer <= 0) { c1.timer += (2048 - c1.freq) * 4; c1.pos = (c1.pos + 1) & 7; } o1 = ((D[c1.duty] >> c1.pos) & 1) * c1.vol; }
+    if (c2.on) { c2.timer -= d; while (c2.timer <= 0) { c2.timer += (2048 - c2.freq) * 4; c2.pos = (c2.pos + 1) & 7; } o2 = ((D[c2.duty] >> c2.pos) & 1) * c2.vol; }
+    if (c3.on) {
+      c3.timer -= d;
+      while (c3.timer <= 0) { c3.timer += (2048 - c3.freq) * 2; c3.pos = (c3.pos + 1) & 31; const b = this.r[0x20 + (c3.pos >> 1)]; c3.sample = (c3.pos & 1) ? (b & 15) : (b >> 4); }
+      o3 = c3.sample >> [4, 0, 1, 2][(this.r[0x0C] >> 5) & 3];
+    }
+    if (c4.on) {
+      c4.timer -= d;
+      while (c4.timer <= 0) {
+        c4.timer += c4.per;
+        const x = (c4.lfsr & 1) ^ ((c4.lfsr >> 1) & 1);
+        c4.lfsr = (c4.lfsr >> 1) | (x << 14); if (c4.w7) c4.lfsr = (c4.lfsr & ~0x40) | (x << 6);
+      }
+      o4 = (~c4.lfsr & 1) * c4.vol;
+    }
+    const pan = this.r[0x15], mv = this.r[0x14];
+    const a1 = this.dac(0) ? o1 / 7.5 - 1 : 0, a2 = this.dac(1) ? o2 / 7.5 - 1 : 0, a3 = this.dac(2) ? o3 / 7.5 - 1 : 0, a4 = this.dac(3) ? o4 / 7.5 - 1 : 0;
+    const L = ((pan & 0x10 ? a1 : 0) + (pan & 0x20 ? a2 : 0) + (pan & 0x40 ? a3 : 0) + (pan & 0x80 ? a4 : 0)) * (((mv >> 4) & 7) + 1) / 64;
+    const R = ((pan & 1 ? a1 : 0) + (pan & 2 ? a2 : 0) + (pan & 4 ? a3 : 0) + (pan & 8 ? a4 : 0)) * ((mv & 7) + 1) / 64;
+    this.accL += L * d; this.accR += R * d; this.accN += d;
+    this.sampT += d * 44100;
+    while (this.sampT >= 4194304) {
+      this.sampT -= 4194304;
+      const sl = this.accN ? this.accL / this.accN : 0, sr = this.accN ? this.accR / this.accN : 0;
+      this.accL = this.accR = this.accN = 0;
+      const yl = sl - this.pL + 0.996 * this.hpL, yr = sr - this.pR + 0.996 * this.hpR;
+      this.pL = sl; this.pR = sr; this.hpL = yl; this.hpR = yr;
+      const np = (this.wpos + 1) % this.bufSize;
+      if (np !== this.rpos) { this.outL[this.wpos] = yl; this.outR[this.wpos] = yr; this.wpos = np; }
+    }
+  }
+}
+
+class GB {
+  constructor() {
+    this.system = 'gb'; this.width = 160; this.height = 144; this.fps = 4194304 / 70224;
+    this.image = new Uint32Array(160 * 144);
+    this.vram = new Uint8Array(0x4000); this.wram = new Uint8Array(0x8000); this.oam = new Uint8Array(0xA0); this.hram = new Uint8Array(0x7F);
+    this.bgPal = new Uint8Array(64); this.obPal = new Uint8Array(64);
+    this.lineCol = new Uint8Array(160); this.lineAttr = new Uint8Array(160); this.spCol = new Int32Array(160);
+    this.pad = [0, 0]; this.sram = new Uint8Array(0); this.sramDirty = false; this.serial = ''; this.rtcOff = 0;
+    this.apu = new GbAPU(this);
+  }
+  get audio() { return this.apu; }
+  get label() { return this.cgb ? 'GBC' : 'GB'; }
+  loadROM(d, name) {
+    if (d.length < 0x150) throw new Error('ゲームボーイのROMではありません');
+    this.rom = d;
+    const cgbFlag = d[0x143];
+    this.cgb = (cgbFlag & 0x80) ? 1 : 0;
+    this.system = this.cgb ? 'gbc' : 'gb';
+    let t = ''; for (let i = 0x134; i < (this.cgb ? 0x13F : 0x144); i++) { const c = d[i]; if (!c) break; if (c >= 32 && c < 127) t += String.fromCharCode(c); }
+    this.title = t.trim() || (name || 'GAMEBOY').replace(/\.[^.]+$/, '');
+    const type = d[0x147];
+    this.mbc = [0x01, 0x02, 0x03].includes(type) ? 1 : [0x05, 0x06].includes(type) ? 2 : (type >= 0x0F && type <= 0x13) ? 3 : (type >= 0x19 && type <= 0x1E) ? 5 : 0;
+    if (type && !this.mbc && ![0x08, 0x09].includes(type)) throw new Error('未対応のカートリッジ種類です（0x' + type.toString(16) + '）');
+    this.battery = [0x03, 0x06, 0x09, 0x0D, 0x0F, 0x10, 0x13, 0x1B, 0x1E].includes(type);
+    this.hasRtc = type === 0x0F || type === 0x10;
+    const rs = [0, 0x800, 0x2000, 0x8000, 0x20000, 0x10000][d[0x149]] || 0;
+    this.eram = new Uint8Array(this.mbc === 2 ? 512 : Math.max(rs, 0));
+    this.sram = this.battery ? this.eram : new Uint8Array(0);
+    this.romBanks = Math.max(2, d.length >> 14);
+    this.reset();
+  }
+  reset() {
+    const C = this.cgb;
+    this.a = C ? 0x11 : 0x01; this.f = 0xB0; this.b = 0; this.c = 0x13; this.d = 0; this.e = 0xD8; this.h = 0x01; this.l = 0x4D;
+    if (C) { this.f = 0x80; this.c = 0; this.d = 0xFF; this.e = 0x56; this.h = 0; this.l = 0x0D; }
+    this.sp = 0xFFFE; this.pc = 0x100; this.ime = 0; this.eiDelay = 0; this.halted = 0; this.haltBug = 0; this.stopped = 0;
+    this.vram.fill(0); this.wram.fill(0); this.oam.fill(0); this.hram.fill(0); if (!this.battery) this.eram.fill(0);
+    this.if_ = 0xE1; this.ie = 0; this.divc = 0xABCC; this.tima = 0; this.tma = 0; this.tac = 0xF8;
+    this.lcdc = 0x91; this.stat = 0x85; this.scy = 0; this.scx = 0; this.ly = 0; this.lyc = 0; this.bgp = 0xFC; this.obp0 = 0xFF; this.obp1 = 0xFF; this.wy = 0; this.wx = 0; this.dmaReg = 0xFF;
+    this.mode = 2; this.dot = 0; this.winLine = 0; this.statLine = 0; this.frameDone = false; this.frameDots = 0;
+    this.joyp = 0xCF; this.padState = 0; this.sb = 0; this.sc = 0;
+    this.vbank = 0; this.wbank = 1; this.speed = 0; this.key1 = 0;
+    this.bcps = 0; this.ocps = 0; this.bgPal.fill(0xFF); this.obPal.fill(0xFF); for (let i = 1; i < 64; i += 2) { this.bgPal[i] = 0x7F; this.obPal[i] = 0x7F; }
+    this.hdmaSrc = 0; this.hdmaDst = 0; this.hdmaLen = 0; this.hdmaActive = 0; this.hdma1 = 0; this.hdma2 = 0; this.hdma3 = 0; this.hdma4 = 0;
+    this.romBank = 1; this.ramBank = 0; this.ramEn = 0; this.mbcMode = 0; this.bankHi = 0; this.rtcLatch = new Uint8Array(5); this.rtcSel = 0; this.latchW = 0;
+    this.romOff0 = 0; this.romOff1 = 0x4000;
+    this.apu.reset();
+    this.serial = '';
+  }
+  updateBanks() {
+    const n = this.romBanks;
+    if (this.mbc === 1) {
+      const big = this.romBanks > 32;
+      let lo = this.romBank & 31; if (!lo) lo = 1;
+      const hi = big ? this.bankHi << 5 : 0;
+      this.romOff1 = ((hi | lo) % n) * 0x4000;
+      this.romOff0 = (this.mbcMode && big ? (hi % n) : 0) * 0x4000;
+    } else if (this.mbc === 5) this.romOff1 = (this.romBank % n) * 0x4000;
+    else if (this.mbc) this.romOff1 = ((this.romBank || 1) % n) * 0x4000;
+  }
+  // ---------- memory ----------
+  read(a) {
+    if (a < 0x4000) return this.rom[this.romOff0 + a] ?? 0xFF;
+    if (a < 0x8000) return this.rom[this.romOff1 + a - 0x4000] ?? 0xFF;
+    if (a < 0xA000) return this.vram[(this.vbank << 13) + a - 0x8000];
+    if (a < 0xC000) return this.readExt(a);
+    if (a < 0xD000) return this.wram[a - 0xC000];
+    if (a < 0xE000) return this.wram[(this.wbank << 12) + a - 0xD000];
+    if (a < 0xFE00) return this.read(a - 0x2000);
+    if (a < 0xFEA0) return this.oam[a - 0xFE00];
+    if (a < 0xFF00) return 0xFF;
+    if (a < 0xFF80) return this.readIO(a);
+    if (a < 0xFFFF) return this.hram[a - 0xFF80];
+    return this.ie;
+  }
+  write(a, v) {
+    if (a < 0x8000) { this.mbcWrite(a, v); return; }
+    if (a < 0xA000) { this.vram[(this.vbank << 13) + a - 0x8000] = v; return; }
+    if (a < 0xC000) { this.writeExt(a, v); return; }
+    if (a < 0xD000) { this.wram[a - 0xC000] = v; return; }
+    if (a < 0xE000) { this.wram[(this.wbank << 12) + a - 0xD000] = v; return; }
+    if (a < 0xFE00) { this.write(a - 0x2000, v); return; }
+    if (a < 0xFEA0) { this.oam[a - 0xFE00] = v; return; }
+    if (a < 0xFF00) return;
+    if (a < 0xFF80) { this.writeIO(a, v); return; }
+    if (a < 0xFFFF) { this.hram[a - 0xFF80] = v; return; }
+    this.ie = v;
+  }
+  rtcRegs() {
+    const t = Math.floor(Date.now() / 1000) + (this.rtcOff || 0);
+    const days = Math.floor(t / 86400);
+    return [t % 60, Math.floor(t / 60) % 60, Math.floor(t / 3600) % 24, days & 255, ((days >> 8) & 1) | (days > 511 ? 0x80 : 0)];
+  }
+  readExt(a) {
+    if (!this.ramEn) return 0xFF;
+    if (this.mbc === 3 && this.rtcSel) return this.rtcLatch[this.rtcSel - 8] ?? 0xFF;
+    if (!this.eram.length) return 0xFF;
+    if (this.mbc === 2) return this.eram[(a - 0xA000) & 511] | 0xF0;
+    const bank = this.mbc === 1 ? (this.mbcMode ? this.bankHi : 0) : this.ramBank;
+    return this.eram[((bank << 13) + a - 0xA000) % this.eram.length];
+  }
+  writeExt(a, v) {
+    if (!this.ramEn) return;
+    if (this.mbc === 3 && this.rtcSel) {
+      const r = this.rtcRegs(); r[this.rtcSel - 8] = v;
+      const want = r[0] + r[1] * 60 + r[2] * 3600 + (r[3] + ((r[4] & 1) << 8)) * 86400;
+      this.rtcOff = (this.rtcOff || 0) + want - (Math.floor(Date.now() / 1000) + (this.rtcOff || 0)) % (512 * 86400);
+      return;
+    }
+    if (!this.eram.length) return;
+    let i;
+    if (this.mbc === 2) { i = (a - 0xA000) & 511; v &= 15; }
+    else { const bank = this.mbc === 1 ? (this.mbcMode ? this.bankHi : 0) : this.ramBank; i = ((bank << 13) + a - 0xA000) % this.eram.length; }
+    if (this.eram[i] !== v) { this.eram[i] = v; if (this.battery) this.sramDirty = true; }
+  }
+  mbcWrite(a, v) {
+    switch (this.mbc) {
+      case 1:
+        if (a < 0x2000) this.ramEn = (v & 15) === 10;
+        else if (a < 0x4000) this.romBank = v & 31;
+        else if (a < 0x6000) this.bankHi = v & 3;
+        else this.mbcMode = v & 1;
+        break;
+      case 2:
+        if (a < 0x4000) { if (a & 0x100) this.romBank = (v & 15) || 1; else this.ramEn = (v & 15) === 10; }
+        break;
+      case 3:
+        if (a < 0x2000) this.ramEn = (v & 15) === 10;
+        else if (a < 0x4000) this.romBank = (v & 0x7F) || 1;
+        else if (a < 0x6000) { if (v >= 8 && v <= 12) this.rtcSel = v; else { this.rtcSel = 0; this.ramBank = v & 3; } }
+        else { if (this.latchW === 0 && v === 1) this.rtcLatch.set(this.rtcRegs()); this.latchW = v; }
+        break;
+      case 5:
+        if (a < 0x2000) this.ramEn = (v & 15) === 10;
+        else if (a < 0x3000) this.romBank = (this.romBank & 0x100) | v;
+        else if (a < 0x4000) this.romBank = (this.romBank & 0xFF) | ((v & 1) << 8);
+        else if (a < 0x6000) this.ramBank = v & 15;
+        break;
+    }
+    this.updateBanks();
+  }
+  readIO(a) {
+    if (a >= 0xFF10 && a < 0xFF40) return this.apu.read(a);
+    switch (a) {
+      case 0xFF00: {
+        let lo = 0x0F; const s = this.padState;
+        if (!(this.joyp & 0x10)) lo &= ~(s & 15);
+        if (!(this.joyp & 0x20)) lo &= ~(s >> 4);
+        return 0xC0 | (this.joyp & 0x30) | lo;
+      }
+      case 0xFF01: return this.sb;
+      case 0xFF02: return this.sc | 0x7E;
+      case 0xFF04: return this.divc >> 8;
+      case 0xFF05: return this.tima;
+      case 0xFF06: return this.tma;
+      case 0xFF07: return this.tac | 0xF8;
+      case 0xFF0F: return this.if_ | 0xE0;
+      case 0xFF40: return this.lcdc;
+      case 0xFF41: return 0x80 | (this.stat & 0x78) | (this.ly === this.lyc ? 4 : 0) | ((this.lcdc & 0x80) ? this.mode : 0);
+      case 0xFF42: return this.scy;
+      case 0xFF43: return this.scx;
+      case 0xFF44: return this.ly;
+      case 0xFF45: return this.lyc;
+      case 0xFF46: return this.dmaReg;
+      case 0xFF47: return this.bgp;
+      case 0xFF48: return this.obp0;
+      case 0xFF49: return this.obp1;
+      case 0xFF4A: return this.wy;
+      case 0xFF4B: return this.wx;
+    }
+    if (!this.cgb) return 0xFF;
+    switch (a) {
+      case 0xFF4D: return 0x7E | (this.speed << 7) | (this.key1 & 1);
+      case 0xFF4F: return 0xFE | this.vbank;
+      case 0xFF55: return this.hdmaActive ? ((this.hdmaLen - 1) & 0x7F) : 0xFF;
+      case 0xFF68: return this.bcps | 0x40;
+      case 0xFF69: return this.bgPal[this.bcps & 0x3F];
+      case 0xFF6A: return this.ocps | 0x40;
+      case 0xFF6B: return this.obPal[this.ocps & 0x3F];
+      case 0xFF70: return 0xF8 | this.wbank;
+    }
+    return 0xFF;
+  }
+  writeIO(a, v) {
+    if (a >= 0xFF10 && a < 0xFF40) { this.apu.write(a, v); return; }
+    switch (a) {
+      case 0xFF00: this.joyp = v & 0x30; return;
+      case 0xFF01: this.sb = v; return;
+      case 0xFF02: this.sc = v; if ((v & 0x81) === 0x81) { this.serial += String.fromCharCode(this.sb); if (this.serial.length > 4000) this.serial = this.serial.slice(-2000); this.sb = 0xFF; this.sc &= 0x7F; this.if_ |= 8; } return;
+      case 0xFF04: { const bit = GB_TIMER_BIT[this.tac & 3]; if ((this.tac & 4) && (this.divc & bit)) this.incTima(); if ((this.divc & (this.speed ? 0x2000 : 0x1000)) && this.apu.power) this.apu.frameSeq(); this.divc = 0; return; }
+      case 0xFF05: this.tima = v; return;
+      case 0xFF06: this.tma = v; return;
+      case 0xFF07: this.tac = v & 7; return;
+      case 0xFF0F: this.if_ = v & 0x1F; return;
+      case 0xFF40: {
+        const was = this.lcdc & 0x80; this.lcdc = v;
+        if (was && !(v & 0x80)) { this.ly = 0; this.dot = 0; this.mode = 0; this.winLine = 0; }
+        else if (!was && (v & 0x80)) { this.ly = 0; this.dot = 0; this.mode = 2; this.winLine = 0; this.checkStat(); }
+        return;
+      }
+      case 0xFF41: this.stat = (this.stat & 7) | (v & 0x78); this.checkStat(); return;
+      case 0xFF42: this.scy = v; return;
+      case 0xFF43: this.scx = v; return;
+      case 0xFF44: return;
+      case 0xFF45: this.lyc = v; this.checkStat(); return;
+      case 0xFF46: { this.dmaReg = v; const s = v << 8; for (let i = 0; i < 0xA0; i++) this.oam[i] = this.read(s + i); return; }
+      case 0xFF47: this.bgp = v; return;
+      case 0xFF48: this.obp0 = v; return;
+      case 0xFF49: this.obp1 = v; return;
+      case 0xFF4A: this.wy = v; return;
+      case 0xFF4B: this.wx = v; return;
+    }
+    if (!this.cgb) return;
+    switch (a) {
+      case 0xFF4D: this.key1 = v & 1; return;
+      case 0xFF4F: this.vbank = v & 1; return;
+      case 0xFF51: this.hdma1 = v; return;
+      case 0xFF52: this.hdma2 = v & 0xF0; return;
+      case 0xFF53: this.hdma3 = v & 0x1F; return;
+      case 0xFF54: this.hdma4 = v & 0xF0; return;
+      case 0xFF55:
+        if (this.hdmaActive && !(v & 0x80)) { this.hdmaActive = 0; return; }
+        this.hdmaSrc = (this.hdma1 << 8) | this.hdma2; this.hdmaDst = (this.hdma3 << 8) | this.hdma4; this.hdmaLen = (v & 0x7F) + 1;
+        if (v & 0x80) this.hdmaActive = 1;
+        else { while (this.hdmaLen > 0) this.hdmaBlock(); }
+        return;
+      case 0xFF68: this.bcps = v & 0xBF; return;
+      case 0xFF69: this.bgPal[this.bcps & 0x3F] = v; if (this.bcps & 0x80) this.bcps = 0x80 | ((this.bcps + 1) & 0x3F); return;
+      case 0xFF6A: this.ocps = v & 0xBF; return;
+      case 0xFF6B: this.obPal[this.ocps & 0x3F] = v; if (this.ocps & 0x80) this.ocps = 0x80 | ((this.ocps + 1) & 0x3F); return;
+      case 0xFF70: this.wbank = (v & 7) || 1; return;
+    }
+  }
+  hdmaBlock() {
+    for (let i = 0; i < 16; i++) {
+      this.vram[(this.vbank << 13) + (this.hdmaDst & 0x1FFF)] = this.read(this.hdmaSrc);
+      this.hdmaSrc = (this.hdmaSrc + 1) & 0xFFFF; this.hdmaDst = (this.hdmaDst + 1) & 0x1FFF;
+    }
+    if (--this.hdmaLen <= 0) { this.hdmaLen = 0; this.hdmaActive = 0; }
+  }
+  incTima() { if (this.tima === 0xFF) { this.tima = this.tma; this.if_ |= 4; } else this.tima++; }
+  // ---------- PPU ----------
+  checkStat() {
+    const s = this.stat, m = this.mode;
+    const line = (this.lcdc & 0x80) && (((s & 0x40) && this.ly === this.lyc) || ((s & 8) && m === 0) || ((s & 0x10) && m === 1) || ((s & 0x20) && m === 2));
+    if (line && !this.statLine) this.if_ |= 2;
+    this.statLine = line ? 1 : 0;
+  }
+  ppuTick(d) {
+    if (!(this.lcdc & 0x80)) return;
+    this.dot += d;
+    for (;;) {
+      if (this.ly < 144) {
+        if (this.mode === 2 && this.dot >= 80) { this.mode = 3; this.renderLine(); }
+        if (this.mode === 3 && this.dot >= 252) { this.mode = 0; this.checkStat(); if (this.hdmaActive) this.hdmaBlock(); }
+      }
+      if (this.dot < 456) break;
+      this.dot -= 456; this.ly++;
+      if (this.ly === 144) { this.mode = 1; this.if_ |= 1; this.frameDone = true; }
+      else if (this.ly > 153) { this.ly = 0; this.mode = 2; this.winLine = 0; }
+      else if (this.ly < 144) this.mode = 2;
+      this.checkStat();
+    }
+  }
+  renderLine() {
+    const ly = this.ly, lcdc = this.lcdc, cgb = this.cgb, vram = this.vram, out = this.image, row = ly * 160;
+    const col = this.lineCol, attr = this.lineAttr;
+    if (cgb || (lcdc & 1)) {
+      const unsigned = lcdc & 0x10, wxs = this.wx - 7;
+      const winOn = (lcdc & 0x20) && this.wy <= ly && this.wx <= 166;
+      let usedWin = false;
+      for (let x = 0; x < 160;) {
+        let mapBase, px, py;
+        if (winOn && x >= wxs) { mapBase = (lcdc & 0x40) ? 0x1C00 : 0x1800; px = x - wxs; py = this.winLine; usedWin = true; }
+        else { mapBase = (lcdc & 8) ? 0x1C00 : 0x1800; px = (x + this.scx) & 255; py = (ly + this.scy) & 255; }
+        const mi = mapBase + ((py >> 3) << 5) + (px >> 3);
+        const tile = vram[mi], at = cgb ? vram[0x2000 + mi] : 0;
+        const tAddr = (unsigned ? tile * 16 : 0x1000 + ((tile << 24) >> 24) * 16) + (((at & 0x40) ? 7 - (py & 7) : (py & 7)) << 1) + ((at & 8) ? 0x2000 : 0);
+        const lo = vram[tAddr], hi = vram[tAddr + 1];
+        // draw until tile boundary (or window start)
+        let n = 8 - (px & 7);
+        if (winOn && x < wxs && x + n > wxs) n = wxs - x;
+        for (let k = 0; k < n && x < 160; k++, x++) {
+          let bit = (px + k) & 7; if (!(at & 0x20)) bit = 7 - bit;
+          col[x] = ((lo >> bit) & 1) | (((hi >> bit) & 1) << 1); attr[x] = at;
+        }
+      }
+      if (usedWin) this.winLine++;
+    } else { col.fill(0); attr.fill(0); }
+    // BG colors
+    if (cgb) {
+      const bp = this.bgPal, lut = GB_CGB_LUT;
+      for (let x = 0; x < 160; x++) { const i = (((attr[x] & 7) << 2) + col[x]) << 1; out[row + x] = lut[(bp[i] | (bp[i + 1] << 8)) & 0x7FFF]; }
+    } else {
+      const p = this.bgp;
+      for (let x = 0; x < 160; x++) out[row + x] = GB_DMG[(p >> (col[x] << 1)) & 3];
+    }
+    if (!(lcdc & 2)) return;
+    // sprites
+    const h = (lcdc & 4) ? 16 : 8, oam = this.oam, list = [];
+    for (let i = 0; i < 40 && list.length < 10; i++) { const y = oam[i * 4] - 16; if (ly >= y && ly < y + h) list.push(i); }
+    if (!cgb) list.sort((p, q) => (oam[p * 4 + 1] - oam[q * 4 + 1]) || (p - q));
+    const sp = this.spCol; sp.fill(-1);
+    for (const i of list) {
+      const y = oam[i * 4] - 16, x = oam[i * 4 + 1] - 8, at = oam[i * 4 + 3];
+      let tile = oam[i * 4 + 2]; if (h === 16) tile &= 0xFE;
+      let r = ly - y; if (at & 0x40) r = h - 1 - r;
+      const ta = tile * 16 + r * 2 + ((cgb && (at & 8)) ? 0x2000 : 0);
+      const lo = vram[ta], hi = vram[ta + 1];
+      for (let k = 0; k < 8; k++) {
+        const sx = x + k; if (sx < 0 || sx >= 160 || sp[sx] >= 0) continue;
+        const bit = (at & 0x20) ? k : 7 - k, c = ((lo >> bit) & 1) | (((hi >> bit) & 1) << 1);
+        if (!c) continue;
+        sp[sx] = (c) | (at << 8);
+      }
+    }
+    for (let x = 0; x < 160; x++) {
+      const s = sp[x]; if (s < 0) continue;
+      const c = s & 3, at = s >> 8;
+      if (cgb) {
+        if ((lcdc & 1) && col[x] && ((attr[x] & 0x80) || (at & 0x80))) continue;
+        const i = (((at & 7) << 2) + c) << 1, op = this.obPal;
+        out[row + x] = GB_CGB_LUT[(op[i] | (op[i + 1] << 8)) & 0x7FFF];
+      } else {
+        if ((at & 0x80) && col[x]) continue;
+        const p = (at & 0x10) ? this.obp1 : this.obp0;
+        out[row + x] = GB_DMG[(p >> (c << 1)) & 3];
+      }
+    }
+  }
+  // ---------- CPU ----------
+  fetch() { const v = this.read(this.pc); if (this.haltBug) this.haltBug = 0; else this.pc = (this.pc + 1) & 0xFFFF; return v; }
+  fetch16() { const l = this.fetch(); return l | (this.fetch() << 8); }
+  r8(i) {
+    switch (i) { case 0: return this.b; case 1: return this.c; case 2: return this.d; case 3: return this.e; case 4: return this.h; case 5: return this.l; case 6: return this.read((this.h << 8) | this.l); default: return this.a; }
+  }
+  w8(i, v) {
+    switch (i) { case 0: this.b = v; break; case 1: this.c = v; break; case 2: this.d = v; break; case 3: this.e = v; break; case 4: this.h = v; break; case 5: this.l = v; break; case 6: this.write((this.h << 8) | this.l, v); break; default: this.a = v; }
+  }
+  push(v) { this.sp = (this.sp - 1) & 0xFFFF; this.write(this.sp, v >> 8); this.sp = (this.sp - 1) & 0xFFFF; this.write(this.sp, v & 0xFF); }
+  pop() { const l = this.read(this.sp); this.sp = (this.sp + 1) & 0xFFFF; const h = this.read(this.sp); this.sp = (this.sp + 1) & 0xFFFF; return l | (h << 8); }
+  alu(o, v) {
+    const a = this.a; let r, c;
+    switch (o) {
+      case 0: r = a + v; this.f = ((r & 0xFF) ? 0 : 0x80) | (((a & 15) + (v & 15)) > 15 ? 0x20 : 0) | (r > 0xFF ? 0x10 : 0); this.a = r & 0xFF; break;
+      case 1: c = (this.f >> 4) & 1; r = a + v + c; this.f = ((r & 0xFF) ? 0 : 0x80) | (((a & 15) + (v & 15) + c) > 15 ? 0x20 : 0) | (r > 0xFF ? 0x10 : 0); this.a = r & 0xFF; break;
+      case 2: case 7: r = a - v; this.f = ((r & 0xFF) ? 0 : 0x80) | 0x40 | ((a & 15) < (v & 15) ? 0x20 : 0) | (r < 0 ? 0x10 : 0); if (o === 2) this.a = r & 0xFF; break;
+      case 3: c = (this.f >> 4) & 1; r = a - v - c; this.f = ((r & 0xFF) ? 0 : 0x80) | 0x40 | (((a & 15) - (v & 15) - c) < 0 ? 0x20 : 0) | (r < 0 ? 0x10 : 0); this.a = r & 0xFF; break;
+      case 4: this.a = a & v; this.f = (this.a ? 0 : 0x80) | 0x20; break;
+      case 5: this.a = a ^ v; this.f = this.a ? 0 : 0x80; break;
+      case 6: this.a = a | v; this.f = this.a ? 0 : 0x80; break;
+    }
+  }
+  cb() {
+    const op = this.fetch(), r = op & 7, x = op >> 6, y = (op >> 3) & 7;
+    let v = this.r8(r);
+    if (x === 1) { this.f = (this.f & 0x10) | 0x20 | (((v >> y) & 1) ? 0 : 0x80); return r === 6 ? 12 : 8; }
+    if (x === 2) v &= ~(1 << y);
+    else if (x === 3) v |= 1 << y;
+    else {
+      let c = 0; const cf = (this.f >> 4) & 1;
+      switch (y) {
+        case 0: c = v >> 7; v = ((v << 1) | c) & 0xFF; break;
+        case 1: c = v & 1; v = (v >> 1) | (c << 7); break;
+        case 2: c = v >> 7; v = ((v << 1) | cf) & 0xFF; break;
+        case 3: c = v & 1; v = (v >> 1) | (cf << 7); break;
+        case 4: c = v >> 7; v = (v << 1) & 0xFF; break;
+        case 5: c = v & 1; v = (v >> 1) | (v & 0x80); break;
+        case 6: v = ((v << 4) | (v >> 4)) & 0xFF; break;
+        case 7: c = v & 1; v >>= 1; break;
+      }
+      this.f = (v ? 0 : 0x80) | (c ? 0x10 : 0);
+    }
+    this.w8(r, v);
+    return r === 6 ? 16 : 8;
+  }
+  exec() {
+    const op = this.fetch();
+    if (op >= 0x40 && op < 0x80) {
+      if (op === 0x76) {
+        if (!this.ime && (this.ie & this.if_ & 0x1F)) this.haltBug = 1; else this.halted = 1;
+        return 4;
+      }
+      this.w8((op >> 3) & 7, this.r8(op & 7)); return GB_CYC[op];
+    }
+    if (op >= 0x80 && op < 0xC0) { this.alu((op >> 3) & 7, this.r8(op & 7)); return GB_CYC[op]; }
+    let cyc = GB_CYC[op], t, v, hl;
+    const cond = () => { switch ((op >> 3) & 3) { case 0: return !(this.f & 0x80); case 1: return !!(this.f & 0x80); case 2: return !(this.f & 0x10); default: return !!(this.f & 0x10); } };
+    switch (op) {
+      case 0x00: break;
+      case 0x01: this.c = this.fetch(); this.b = this.fetch(); break;
+      case 0x11: this.e = this.fetch(); this.d = this.fetch(); break;
+      case 0x21: this.l = this.fetch(); this.h = this.fetch(); break;
+      case 0x31: this.sp = this.fetch16(); break;
+      case 0x02: this.write((this.b << 8) | this.c, this.a); break;
+      case 0x12: this.write((this.d << 8) | this.e, this.a); break;
+      case 0x22: hl = (this.h << 8) | this.l; this.write(hl, this.a); hl = (hl + 1) & 0xFFFF; this.h = hl >> 8; this.l = hl & 255; break;
+      case 0x32: hl = (this.h << 8) | this.l; this.write(hl, this.a); hl = (hl - 1) & 0xFFFF; this.h = hl >> 8; this.l = hl & 255; break;
+      case 0x0A: this.a = this.read((this.b << 8) | this.c); break;
+      case 0x1A: this.a = this.read((this.d << 8) | this.e); break;
+      case 0x2A: hl = (this.h << 8) | this.l; this.a = this.read(hl); hl = (hl + 1) & 0xFFFF; this.h = hl >> 8; this.l = hl & 255; break;
+      case 0x3A: hl = (this.h << 8) | this.l; this.a = this.read(hl); hl = (hl - 1) & 0xFFFF; this.h = hl >> 8; this.l = hl & 255; break;
+      case 0x03: t = (((this.b << 8) | this.c) + 1) & 0xFFFF; this.b = t >> 8; this.c = t & 255; break;
+      case 0x13: t = (((this.d << 8) | this.e) + 1) & 0xFFFF; this.d = t >> 8; this.e = t & 255; break;
+      case 0x23: t = (((this.h << 8) | this.l) + 1) & 0xFFFF; this.h = t >> 8; this.l = t & 255; break;
+      case 0x33: this.sp = (this.sp + 1) & 0xFFFF; break;
+      case 0x0B: t = (((this.b << 8) | this.c) - 1) & 0xFFFF; this.b = t >> 8; this.c = t & 255; break;
+      case 0x1B: t = (((this.d << 8) | this.e) - 1) & 0xFFFF; this.d = t >> 8; this.e = t & 255; break;
+      case 0x2B: t = (((this.h << 8) | this.l) - 1) & 0xFFFF; this.h = t >> 8; this.l = t & 255; break;
+      case 0x3B: this.sp = (this.sp - 1) & 0xFFFF; break;
+      case 0x04: case 0x0C: case 0x14: case 0x1C: case 0x24: case 0x2C: case 0x34: case 0x3C: {
+        const i = (op >> 3) & 7; v = (this.r8(i) + 1) & 0xFF; this.w8(i, v);
+        this.f = (this.f & 0x10) | (v ? 0 : 0x80) | ((v & 15) === 0 ? 0x20 : 0); break;
+      }
+      case 0x05: case 0x0D: case 0x15: case 0x1D: case 0x25: case 0x2D: case 0x35: case 0x3D: {
+        const i = (op >> 3) & 7; v = (this.r8(i) - 1) & 0xFF; this.w8(i, v);
+        this.f = (this.f & 0x10) | 0x40 | (v ? 0 : 0x80) | ((v & 15) === 15 ? 0x20 : 0); break;
+      }
+      case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x36: case 0x3E: this.w8((op >> 3) & 7, this.fetch()); break;
+      case 0x07: t = this.a >> 7; this.a = ((this.a << 1) | t) & 0xFF; this.f = t << 4; break;
+      case 0x0F: t = this.a & 1; this.a = (this.a >> 1) | (t << 7); this.f = t << 4; break;
+      case 0x17: t = this.a >> 7; this.a = ((this.a << 1) | ((this.f >> 4) & 1)) & 0xFF; this.f = t << 4; break;
+      case 0x1F: t = this.a & 1; this.a = (this.a >> 1) | (((this.f >> 4) & 1) << 7); this.f = t << 4; break;
+      case 0x08: t = this.fetch16(); this.write(t, this.sp & 0xFF); this.write((t + 1) & 0xFFFF, this.sp >> 8); break;
+      case 0x09: case 0x19: case 0x29: case 0x39: {
+        hl = (this.h << 8) | this.l;
+        const rr = op === 0x09 ? (this.b << 8) | this.c : op === 0x19 ? (this.d << 8) | this.e : op === 0x29 ? hl : this.sp;
+        const r = hl + rr;
+        this.f = (this.f & 0x80) | (((hl & 0xFFF) + (rr & 0xFFF)) > 0xFFF ? 0x20 : 0) | (r > 0xFFFF ? 0x10 : 0);
+        this.h = (r >> 8) & 0xFF; this.l = r & 0xFF; break;
+      }
+      case 0x10:
+        this.fetch();
+        if (this.cgb && (this.key1 & 1)) { this.speed ^= 1; this.key1 = 0; this.divc = 0; }
+        break;
+      case 0x18: t = this.fetch(); this.pc = (this.pc + ((t << 24) >> 24)) & 0xFFFF; break;
+      case 0x20: case 0x28: case 0x30: case 0x38: t = this.fetch(); if (cond()) { this.pc = (this.pc + ((t << 24) >> 24)) & 0xFFFF; cyc += 4; } break;
+      case 0x27: {
+        let a = this.a, f = this.f;
+        if (!(f & 0x40)) { if ((f & 0x10) || a > 0x99) { a += 0x60; f |= 0x10; } if ((f & 0x20) || (a & 15) > 9) a += 6; }
+        else { if (f & 0x10) a -= 0x60; if (f & 0x20) a -= 6; }
+        a &= 0xFF; this.a = a; this.f = (f & 0x50) | (a ? 0 : 0x80); break;
+      }
+      case 0x2F: this.a ^= 0xFF; this.f |= 0x60; break;
+      case 0x37: this.f = (this.f & 0x80) | 0x10; break;
+      case 0x3F: this.f = (this.f & 0x90) ^ 0x10; break;
+      case 0xC0: case 0xC8: case 0xD0: case 0xD8: if (cond()) { this.pc = this.pop(); cyc += 12; } break;
+      case 0xC9: this.pc = this.pop(); break;
+      case 0xD9: this.pc = this.pop(); this.ime = 1; break;
+      case 0xC1: t = this.pop(); this.b = t >> 8; this.c = t & 255; break;
+      case 0xD1: t = this.pop(); this.d = t >> 8; this.e = t & 255; break;
+      case 0xE1: t = this.pop(); this.h = t >> 8; this.l = t & 255; break;
+      case 0xF1: t = this.pop(); this.a = t >> 8; this.f = t & 0xF0; break;
+      case 0xC5: this.push((this.b << 8) | this.c); break;
+      case 0xD5: this.push((this.d << 8) | this.e); break;
+      case 0xE5: this.push((this.h << 8) | this.l); break;
+      case 0xF5: this.push((this.a << 8) | this.f); break;
+      case 0xC2: case 0xCA: case 0xD2: case 0xDA: t = this.fetch16(); if (cond()) { this.pc = t; cyc += 4; } break;
+      case 0xC3: this.pc = this.fetch16(); break;
+      case 0xE9: this.pc = (this.h << 8) | this.l; break;
+      case 0xC4: case 0xCC: case 0xD4: case 0xDC: t = this.fetch16(); if (cond()) { this.push(this.pc); this.pc = t; cyc += 12; } break;
+      case 0xCD: t = this.fetch16(); this.push(this.pc); this.pc = t; break;
+      case 0xC6: case 0xCE: case 0xD6: case 0xDE: case 0xE6: case 0xEE: case 0xF6: case 0xFE: this.alu((op >> 3) & 7, this.fetch()); break;
+      case 0xC7: case 0xCF: case 0xD7: case 0xDF: case 0xE7: case 0xEF: case 0xF7: case 0xFF: this.push(this.pc); this.pc = op & 0x38; break;
+      case 0xCB: cyc = this.cb(); break;
+      case 0xE0: this.write(0xFF00 | this.fetch(), this.a); break;
+      case 0xF0: this.a = this.read(0xFF00 | this.fetch()); break;
+      case 0xE2: this.write(0xFF00 | this.c, this.a); break;
+      case 0xF2: this.a = this.read(0xFF00 | this.c); break;
+      case 0xE8: case 0xF8: {
+        v = this.fetch(); const s = (v << 24) >> 24, r = (this.sp + s) & 0xFFFF;
+        this.f = (((this.sp & 15) + (v & 15)) > 15 ? 0x20 : 0) | (((this.sp & 255) + v) > 255 ? 0x10 : 0);
+        if (op === 0xE8) this.sp = r; else { this.h = r >> 8; this.l = r & 255; }
+        break;
+      }
+      case 0xF9: this.sp = (this.h << 8) | this.l; break;
+      case 0xEA: this.write(this.fetch16(), this.a); break;
+      case 0xFA: this.a = this.read(this.fetch16()); break;
+      case 0xF3: this.ime = 0; this.eiDelay = 0; break;
+      case 0xFB: this.eiDelay = 2; break;
+      default: break;
+    }
+    return cyc;
+  }
+  tick(c) {
+    // timer runs at CPU speed
+    for (let i = 0; i < c; i += 4) {
+      const old = this.divc; this.divc = (old + 4) & 0xFFFF;
+      if (this.tac & 4) { const bit = GB_TIMER_BIT[this.tac & 3]; if ((old & bit) && !(this.divc & bit)) this.incTima(); }
+      const fb = this.speed ? 0x2000 : 0x1000;
+      if ((old & fb) && !(this.divc & fb) && this.apu.power) this.apu.frameSeq();
+    }
+    const d = this.speed ? c >> 1 : c;
+    this.ppuTick(d); this.apu.tick(d); this.frameDots += d;
+  }
+  step() {
+    const c = this.halted ? 4 : this.exec();
+    this.tick(c);
+    if (this.eiDelay && --this.eiDelay === 0) this.ime = 1;
+    const pend = this.ie & this.if_ & 0x1F;
+    if (pend) {
+      this.halted = 0;
+      if (this.ime) {
+        this.ime = 0; let n = 0; while (!((pend >> n) & 1)) n++;
+        this.if_ &= ~(1 << n); this.push(this.pc); this.pc = 0x40 + n * 8; this.tick(20);
+      }
+    }
+  }
+  runFrame() {
+    const s = this.pad[0] || 0;
+    const st = ((s & 0xC0) ? 0x10 : 0) | ((s & 0xC000) ? 0x20 : 0) | ((s & 0x2000) ? 0x40 : 0) | ((s & 0x1000) ? 0x80 : 0) |
+      ((s & 0x100) ? 1 : 0) | ((s & 0x200) ? 2 : 0) | ((s & 0x800) ? 4 : 0) | ((s & 0x400) ? 8 : 0);
+    if (st & ~this.padState) this.if_ |= 0x10;
+    this.padState = st;
+    this.frameDone = false; this.frameDots = 0;
+    while (!this.frameDone) {
+      this.step();
+      if (this.frameDots >= 70224 + 456 || (!(this.lcdc & 0x80) && this.frameDots >= 70224)) break;
+    }
+  }
+  saveState() {
+    return {
+      v: 1, title: this.title, romLen: this.rom.length,
+      sys: snapObj(this, ['rom', 'image', 'apu', 'lineCol', 'lineAttr', 'spCol', 'pad', 'sramDirty', 'sram', 'serial', 'width', 'height', 'fps', 'system']),
+      apu: snapObj(this.apu, ['gb', 'outL', 'outR', 'wpos', 'rpos', 'bufSize']),
+      ch: ['c1', 'c2', 'c3', 'c4'].map(k => Object.assign({}, this.apu[k])),
+    };
+  }
+  loadState(st) {
+    if (!st || st.title !== this.title || st.romLen !== this.rom.length) throw new Error('このソフトのセーブデータではありません');
+    restoreObj(this, st.sys); restoreObj(this.apu, st.apu);
+    ['c1', 'c2', 'c3', 'c4'].forEach((k, i) => Object.assign(this.apu[k], st.ch[i]));
+    this.apu.rpos = this.apu.wpos;
+  }
+}
 
 // ===== 7z extractor (pure JS): Copy / LZMA / LZMA2 / BCJ(x86) / Deflate(via DecompressionStream) =====
 const SevenZ = (() => {
@@ -2213,15 +3624,30 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
 (() => {
   const BITS = { B: 0x8000, Y: 0x4000, SEL: 0x2000, START: 0x1000, UP: 0x800, DOWN: 0x400, LEFT: 0x200, RIGHT: 0x100, A: 0x80, X: 0x40, L: 0x20, R: 0x10 };
   const $ = id => document.getElementById(id);
-  const cv = $('cv'), ctx = cv.getContext('2d'), img = ctx.createImageData(256, 224);
-  const img32 = new Uint32Array(img.data.buffer);
-  let snes = null, running = false, paused = false, ff = false, muted = false;
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  let img = ctx.createImageData(256, 224), img32 = new Uint32Array(img.data.buffer);
+  function setupScreen(w, h) {
+    cv.width = w; cv.height = h; img = ctx.createImageData(w, h); img32 = new Uint32Array(img.data.buffer);
+    const scr = cv.parentElement; scr.style.aspectRatio = w + ' / ' + h; scr.style.setProperty('--ar', (w / h).toFixed(6));
+    $('vidlabel').textContent = 'VIDEO ' + w + '×' + h;
+  }
+  const ROM_RE = /\.(sfc|smc|fig|swc|bin|nes|gb|gbc)$/i;
+  function createSystem(buf, name) {
+    const ext = ((name || '').match(/\.([a-z0-9]+)$/i) || [])[1]?.toLowerCase() || '';
+    const isNes = buf[0] === 0x4E && buf[1] === 0x45 && buf[2] === 0x53 && buf[3] === 0x1A;
+    let gbOk = false;
+    if (buf.length >= 0x8000) { let x = 0; for (let i = 0x134; i < 0x14D; i++) x = (x - buf[i] - 1) & 255; gbOk = x === buf[0x14D] && buf[0x104] === 0xCE && buf[0x105] === 0xED; }
+    if (ext === 'nes' || isNes) return new NES();
+    if (ext === 'gb' || ext === 'gbc' || gbOk) return new GB();
+    return new SNES();
+  }
+  let sys = null, running = false, paused = false, ff = false, muted = false;
   let actx = null, node = null;
   let touchBits = 0, keyBits = 0, padBits = 0;
 
   // ---------- input ----------
   let gpBits = 0;
-  const syncPad = () => { padBits = touchBits | keyBits | gpBits; if (snes) snes.pad[0] = padBits; };
+  const syncPad = () => { padBits = touchBits | keyBits | gpBits; if (sys) sys.pad[0] = padBits; };
   // Gamepad (PS5 / Xbox / MFi): standard mapping, SFC button positions
   const GP_MAP = [BITS.B, BITS.A, BITS.Y, BITS.X, BITS.L, BITS.R, BITS.L, BITS.R, BITS.SEL, BITS.START, 0, 0, BITS.UP, BITS.DOWN, BITS.LEFT, BITS.RIGHT];
   let gpName = '', gpHot = 0;
@@ -2295,10 +3721,10 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
       node.onaudioprocess = ev => {
         const L = ev.outputBuffer.getChannelData(0), R = ev.outputBuffer.getChannelData(1);
         const n = L.length;
-        if (!snes || paused || muted) { L.fill(0); R.fill(0); return; }
-        const d = snes.apu.dsp, size = d.bufSize;
+        if (!sys || paused || muted) { L.fill(0); R.fill(0); return; }
+        const d = sys.audio, size = d.bufSize;
         let avail = (d.wpos - d.rpos + size) % size;
-        const step = 32000 / actx.sampleRate;
+        const step = d.rate / actx.sampleRate;
         // keep latency bounded
         if (avail > 6000) { d.rpos = (d.wpos - 3000 + size) % size; avail = 3000; }
         let lastL = 0, lastR = 0;
@@ -2318,19 +3744,19 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
   }
 
   // ---------- save RAM ----------
-  const key = () => 'sfc-sram:' + snes.title + ':' + snes.rom.length;
+  const key = () => 'sfc-sram:' + sys.title + ':' + sys.rom.length;
   function loadSram() {
     try {
       const s = localStorage.getItem(key()); if (!s) return false;
-      const bin = atob(s); const n = Math.min(bin.length, snes.sram.length);
-      for (let i = 0; i < n; i++) snes.sram[i] = bin.charCodeAt(i);
+      const bin = atob(s); const n = Math.min(bin.length, sys.sram.length);
+      for (let i = 0; i < n; i++) sys.sram[i] = bin.charCodeAt(i);
       return true;
     } catch (e) { return false; }
   }
   function saveSram() {
-    if (!snes || !snes.sram.length || !snes.sramDirty) return;
-    snes.sramDirty = false;
-    try { let s = ''; const a = snes.sram; for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); localStorage.setItem(key(), btoa(s)); } catch (e) { }
+    if (!sys || !sys.sram.length || !sys.sramDirty) return;
+    sys.sramDirty = false;
+    try { let s = ''; const a = sys.sram; for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); localStorage.setItem(key(), btoa(s)); } catch (e) { }
   }
   setInterval(saveSram, 2000);
   addEventListener('pagehide', saveSram);
@@ -2366,7 +3792,7 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
   // ---------- save states ----------
   let slot = 1, toastT = 0;
   const toast = msg => { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 1800); $('stat').textContent = msg; };
-  const stKey = n => 'sfc-state:' + snes.title + ':' + snes.rom.length + ':' + n;
+  const stKey = n => 'sfc-state:' + sys.title + ':' + sys.rom.length + ':' + n;
   const memStates = {};
   const hhmm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   function slotLabel() {
@@ -2376,8 +3802,8 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
     $('slot').textContent = 'スロット' + slot + (when || ' 空き');
   }
   function saveState() {
-    if (!snes) return;
-    const str = encodeState(snes.saveState()), k = stKey(slot), now = Date.now();
+    if (!sys) return;
+    const str = encodeState(sys.saveState()), k = stKey(slot), now = Date.now();
     memStates[k] = { str, t: now };
     let persisted = true;
     try { localStorage.setItem(k, str); localStorage.setItem(k + ':t', String(now)); } catch (e) { persisted = false; }
@@ -2385,13 +3811,13 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
     slotLabel();
   }
   function loadState() {
-    if (!snes) return;
+    if (!sys) return;
     const k = stKey(slot);
     let str = null;
     try { str = localStorage.getItem(k); } catch (e) { }
     if (!str && memStates[k]) str = memStates[k].str;
     if (!str) { toast('スロット' + slot + 'にはセーブがありません'); return; }
-    try { snes.loadState(decodeState(str)); syncPad(); toast('スロット' + slot + 'をロードしました'); }
+    try { sys.loadState(decodeState(str)); syncPad(); toast('スロット' + slot + 'をロードしました'); }
     catch (e) { toast('ロードできませんでした：' + e.message); }
   }
   $('slot').onclick = () => { slot = slot % 3 + 1; slotLabel(); };
@@ -2406,32 +3832,37 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
     e.target.value = '';
     $('stat').textContent = f.name + ' を読み込み中…';
     try {
-      let buf = new Uint8Array(await f.arrayBuffer());
+      let buf = new Uint8Array(await f.arrayBuffer()), romName = f.name;
       if (buf[0] === 0x50 && buf[1] === 0x4B) {
         if (!window.JSZip) throw new Error('zipの展開機能を読み込めませんでした。解凍してから開いてください');
         const zip = await JSZip.loadAsync(buf);
         const files = Object.values(zip.files).filter(z => !z.dir);
-        const roms = files.filter(z => /\.(sfc|smc|fig|swc|bin)$/i.test(z.name));
+        const roms = files.filter(z => ROM_RE.test(z.name));
         const pickF = (roms.length ? roms : files).sort((a, b) => (b._data?.uncompressedSize || 0) - (a._data?.uncompressedSize || 0))[0];
         if (!pickF) throw new Error('zipの中にROMが見つかりません');
-        buf = await pickF.async('uint8array');
+        buf = await pickF.async('uint8array'); romName = pickF.name.split('/').pop();
       } else if (buf[0] === 0x37 && buf[1] === 0x7A && buf[2] === 0xBC) {
         $('stat').textContent = f.name + ' を展開中…';
         await new Promise(r => setTimeout(r, 30));
         const files = (await SevenZ.extract(buf)).filter(z => z.data.length);
-        const roms = files.filter(z => /\.(sfc|smc|fig|swc|bin)$/i.test(z.name));
+        const roms = files.filter(z => ROM_RE.test(z.name));
         const pickF = (roms.length ? roms : files).sort((a, b) => b.data.length - a.data.length)[0];
         if (!pickF) throw new Error('7zの中にROMが見つかりません');
-        buf = pickF.data;
+        buf = pickF.data; romName = pickF.name.split('/').pop();
       }
       else if (buf[0] === 0x52 && buf[1] === 0x61 && buf[2] === 0x72) throw new Error('rar形式は未対応です。解凍してから開いてください');
-      if (buf.length < 0x8000) throw new Error('ファイルが小さすぎます（' + buf.length + 'バイト）。ROMではないかもしれません');
+      if (buf.length < 0x4010) throw new Error('ファイルが小さすぎます（' + buf.length + 'バイト）。ROMではないかもしれません');
       saveSram();
-      snes = new SNES(); snes.loadROM(buf);
-      const had = snes.sram.length ? loadSram() : false;
-      if (had) snes.reset();
-      $('title').textContent = snes.title + (snes.hirom ? '  ·  HiROM' : '  ·  LoROM');
-      $('stat').textContent = snes.sram.length ? (had ? 'セーブデータを読み込みました' : 'セーブ対応ソフト') : '起動しました';
+      const next = createSystem(buf, romName);
+      if (next.system === 'sfc' && buf.length < 0x8000) throw new Error('ファイルが小さすぎます（' + buf.length + 'バイト）。ROMではないかもしれません');
+      next.loadROM(buf, romName);
+      sys = next; FRAME = 1000 / sys.fps;
+      setupScreen(sys.width, sys.height);
+      document.body.classList.toggle('bit8', sys.system !== 'sfc');
+      const had = sys.sram.length ? loadSram() : false;
+      if (had) sys.reset();
+      $('title').textContent = sys.title + '  ·  ' + sys.label;
+      $('stat').textContent = sys.sram.length ? (had ? 'セーブデータを読み込みました' : 'セーブ対応ソフト') : '起動しました';
       $('idle').hidden = true;
       ['pause', 'ff', 'reset', 'slot', 'ssave', 'sload'].forEach(id => $(id).disabled = false);
       slot = 1; slotLabel();
@@ -2445,7 +3876,7 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
   $('pause').onclick = () => { paused = !paused; $('pause').setAttribute('aria-pressed', paused); $('stat').textContent = paused ? '一時停止中' : '再開'; if (!paused) last = performance.now(); };
   $('ff').onclick = () => { ff = !ff; $('ff').setAttribute('aria-pressed', ff); };
   $('mute').onclick = () => { muted = !muted; $('mute').setAttribute('aria-pressed', muted); startAudio(); };
-  $('reset').onclick = () => { if (!snes) return; saveSram(); snes.reset(); $('stat').textContent = 'リセットしました'; };
+  $('reset').onclick = () => { if (!sys) return; saveSram(); sys.reset(); $('stat').textContent = 'リセットしました'; };
 
   // ---------- look & feel ----------
   try { if (localStorage.getItem('sfc-scan') === '1') { document.body.classList.add('scan'); $('scan').setAttribute('aria-pressed', 'true'); } } catch (e) { }
@@ -2528,17 +3959,17 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
     }
     frame();
   })();
-  const markOn = () => document.body.classList.toggle('on', !!snes && !paused);
+  const markOn = () => document.body.classList.toggle('on', !!sys && !paused);
   setInterval(markOn, 300);
 
   // ---------- main loop ----------
   requestAnimationFrame(function idlePoll(){ if (!running) { pollGamepad(); requestAnimationFrame(idlePoll); } });
-  const FRAME = 1000 / 60.0988;
+  let FRAME = 1000 / 60.0988;
   let last = 0, acc = 0, frames = 0, fpsT = 0, dtAvg = 16.7;
   function loop(t) {
     requestAnimationFrame(loop);
     pollGamepad();
-    if (!snes || paused) return;
+    if (!sys || paused) return;
     const dt = Math.min(t - last, 100); last = t;
     dtAvg += (dt - dtAvg) * 0.05;
     const locked = dtAvg > 15.5 && dtAvg < 18 && dt < 25;
@@ -2546,11 +3977,11 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
     let n = 0;
     const speed = ff ? 3 : 1;
     while (acc >= FRAME - 0.01 && n < 4 * speed) {
-      for (let k = 0; k < speed; k++) { try { snes.runFrame(); } catch (e) { paused = true; $('stat').textContent = 'エミュレーションが停止しました（未対応の機能かもしれません）'; return; } frames++; }
+      for (let k = 0; k < speed; k++) { try { sys.runFrame(); } catch (e) { paused = true; $('stat').textContent = 'エミュレーションが停止しました（未対応の機能かもしれません）'; return; } frames++; }
       acc -= FRAME; n++;
     }
     if (acc > FRAME * 4) acc = 0;
-    if (n) { img32.set(snes.ppu.image); ctx.putImageData(img, 0, 0); }
+    if (n) { img32.set(sys.image); ctx.putImageData(img, 0, 0); }
     if (t - fpsT > 1000) { $('fps').textContent = Math.round(frames * 1000 / (t - fpsT)) + ' fps'; frames = 0; fpsT = t; }
   }
 })();

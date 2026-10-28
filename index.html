@@ -189,8 +189,12 @@ body.imm.land:not(.gp) .padhint{display:block;position:fixed;z-index:3;left:50%;
       <button class="item" id="full" aria-pressed="false"><i>⛶</i>全画面</button>
       <button class="item" id="menuClose"><i>✕</i>閉じる</button>
     </div>
+    <div class="slotrow" style="grid-template-columns:1fr 1fr">
+      <button class="item" id="bkOut"><i>⇪</i>セーブを書き出す</button>
+      <button class="item" id="bkIn"><i>⇩</i>セーブを読み込む</button>
+    </div>
     <p class="note"><span class="kb">キーボード：<kbd>↑↓←→</kbd> 移動 <kbd>X</kbd>A <kbd>Z</kbd>B <kbd>S</kbd>X <kbd>A</kbd>Y <kbd>Q</kbd>L <kbd>W</kbd>R <kbd>Enter</kbd>START <kbd>Shift</kbd>SELECT <kbd>F2</kbd>セーブ <kbd>F4</kbd>ロード <kbd>Esc</kbd>メニュー<br></span>
-      PS4・PS5・Xboxのコントローラも使えます（つないだら一度ボタンを押してください）。L3でセーブ、R3でロード。<br>横向きにすると画面だけの表示になります（コントローラ用）。バッテリーセーブはこのブラウザに自動保存されます。</p>
+      PS4・PS5・Xboxのコントローラも使えます（つないだら一度ボタンを押してください）。L3でセーブ、R3でロード。<br>横向きにすると画面だけの表示になります（コントローラ用）。バッテリーセーブはこのブラウザに自動保存されます。アプリを入れ直す前は「セーブを書き出す」でファイルに保存しておくと安心です。</p>
   </div>
 </div>
 
@@ -199,6 +203,7 @@ body.imm.land:not(.gp) .padhint{display:block;position:fixed;z-index:3;left:50%;
 <div class="toast" id="toast"></div>
 <div class="padhint">コントローラをつないで、ボタンを1回押してください</div>
 <input type="file" id="file" hidden>
+<input type="file" id="bkFile" accept=".json,application/json" hidden>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
@@ -3944,6 +3949,38 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
   const markOn = () => document.body.classList.toggle('on', !!sys && !paused);
   setInterval(markOn, 300);
 
+  // ---------- backup ----------
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
+  $('bkOut').onclick = async () => {
+    saveSram();
+    const data = {}; let n = 0;
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('sfc-') && k !== 'sfc-scan') { data[k] = localStorage.getItem(k); n++; } } } catch (e) { }
+    if (!n) { toast('書き出すセーブがありません'); return; }
+    const d = new Date(), pad = x => String(x).padStart(2, '0');
+    const name = 'claude-sfc-save-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json';
+    const blob = new Blob([JSON.stringify({ app: 'claude-sfc', v: 1, at: d.toISOString(), data })], { type: 'application/json' });
+    try {
+      const file = new File([blob], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); toast(n + '件のセーブを書き出しました'); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast(n + '件のセーブを書き出しました');
+  };
+  $('bkIn').onclick = () => $('bkFile').click();
+  $('bkFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      if (!j || j.app !== 'claude-sfc' || !j.data) throw new Error('Claude SFCのセーブファイルではありません');
+      let n = 0; for (const k in j.data) if (k.startsWith('sfc-')) { localStorage.setItem(k, j.data[k]); n++; }
+      if (sys && sys.sram.length) { loadSram(); }
+      slotLabel && sys && slotLabel();
+      toast(n + '件のセーブを読み込みました');
+      $('stat').textContent = 'セーブを読み込みました（バッテリーセーブはリセットで反映）';
+    } catch (err) { toast('読み込めませんでした：' + (err.message || err)); }
+  };
+
   // ---------- menu ----------
   function setMenu(open) {
     menuOpen = open; $('menu').hidden = !open;
@@ -3952,7 +3989,7 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
   $('menuBtn').addEventListener('click', () => { startAudio(); setMenu(true); });
   $('menuClose').onclick = () => setMenu(false);
   $('menu').addEventListener('click', e => { if (e.target === $('menu')) setMenu(false); });
-  ['load', 'ssave', 'sload', 'reset', 'full'].forEach(id => $(id).addEventListener('click', () => setMenu(false)));
+  ['load', 'ssave', 'sload', 'reset', 'full', 'bkOut', 'bkIn'].forEach(id => $(id).addEventListener('click', () => setMenu(false)));
 
   // ---------- main loop ----------
   requestAnimationFrame(function idlePoll(){ if (!running) { pollGamepad(); requestAnimationFrame(idlePoll); } });

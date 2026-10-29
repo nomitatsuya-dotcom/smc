@@ -43,16 +43,14 @@ body.scan .screen::after{content:"";position:absolute;inset:0;pointer-events:non
 .statusbar{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:8px;padding:3px max(10px,env(safe-area-inset-right,0px)) 4px max(10px,env(safe-area-inset-left,0px));font:11px var(--f-pix);color:#8b8fa3;font-variant-numeric:tabular-nums;pointer-events:none}
 .statusbar span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* idle (no cartridge) */
-.idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;text-align:center;padding:12px 12px 5%}
-.idle canvas{position:absolute;inset:0;z-index:0}
-.idle>*:not(canvas){position:relative;z-index:1}
-.win{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 14px;width:min(92%,420px);box-sizing:border-box;background:linear-gradient(180deg,#3b4fae 0%,#2a3a8c 40%,#1b2662 100%);box-shadow:inset 0 0 0 2px #10142c,inset 0 0 0 4px #e9e7f2,inset 0 0 0 6px #8d91ad}
-.idle h1{font-family:var(--f-pix);font-weight:400;font-size:clamp(15px,4vw,22px);margin:0;color:var(--cream);text-shadow:2px 2px 0 #000;text-wrap:balance}
-.idle p{margin:0;color:#d9d6e8;font-size:11px;line-height:1.6;max-width:34ch;text-shadow:1px 1px 0 #000}
-.blink{animation:blink 1.1s steps(2,end) infinite}
-@keyframes blink{50%{opacity:.25}}
-
+/* idle (no cartridge): boot screen */
+.idle{position:absolute;inset:0;background:#05060d}
+.idle canvas{position:absolute;inset:0}
+.tapzone{position:absolute;inset:0;background:none;border:0;cursor:pointer;padding:0}
+.tapzone:focus-visible{outline:2px solid var(--teal);outline-offset:-4px}
+.idle-foot{position:absolute;left:0;right:0;bottom:3%;display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none;font-family:var(--f-pix);text-align:center}
+.idle-foot span{font-size:clamp(10px,2.8vw,12px);color:#8c92b0;letter-spacing:.06em}
+.idle-foot .sys{font-size:clamp(9px,2.4vw,11px);color:#4c5274;letter-spacing:.32em}
 /* deck */
 .deck{flex:0 0 auto;position:relative;background:linear-gradient(180deg,var(--putty-hi),var(--putty) 18%,var(--putty) 85%,var(--putty-lo));touch-action:none;
   display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;align-items:center;
@@ -64,7 +62,11 @@ body.scan .screen::after{content:"";position:absolute;inset:0;pointer-events:non
 .shoulder.l{border-radius:0 0 22px 0;margin-right:10px;text-align:left;padding-left:max(28px,env(safe-area-inset-left,0px))}
 .shoulder.r{border-radius:0 0 0 22px;margin-left:10px;text-align:right;padding-right:max(28px,env(safe-area-inset-right,0px))}
 /* d-pad */
-.dpad{position:relative;width:var(--dp);height:var(--dp);justify-self:center;touch-action:none;margin:6px 0}
+.dpad{position:relative;width:var(--dp);height:var(--dp);justify-self:center;touch-action:none;margin:6px 0;transform:perspective(520px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .06s}
+.dpad::before{content:"";position:absolute;inset:-16px;border-radius:28px}
+.dpad .dg{position:absolute;width:30%;height:30%;display:flex;align-items:center;justify-content:center;color:#b9b09c;font-size:clamp(12px,3.4vw,18px);line-height:1;pointer-events:none}
+.dpad .ul{left:0;top:0}.dpad .ur{right:0;top:0}.dpad .dl{left:0;bottom:0}.dpad .dr{right:0;bottom:0}
+.dpad.u.l .ul,.dpad.u.r .ur,.dpad.d.l .dl,.dpad.d.r .dr{color:var(--teal)}
 .dpad .arm{position:absolute;background:linear-gradient(180deg,var(--slate-hi),var(--slate) 40%,var(--slate-lo));border-radius:12px;box-shadow:0 4px 0 rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.12)}
 .dpad .h{left:0;right:0;top:33%;height:34%}.dpad .v{top:0;bottom:0;left:33%;width:34%}
 .dpad .hub{position:absolute;left:39%;top:39%;width:22%;height:22%;border-radius:50%;background:radial-gradient(circle at 50% 40%,var(--slate-lo),#16181d);box-shadow:inset 0 2px 3px rgba(0,0,0,.5)}
@@ -137,9 +139,8 @@ body.imm.land:not(.gp) .padhint{display:block;position:fixed;z-index:3;left:50%;
       <canvas id="cv" width="256" height="224"></canvas>
       <div class="idle" id="idle">
         <canvas id="idlecv" width="256" height="224"></canvas>
-        <div class="win"><h1>カセットをセットしてください</h1>
-          <p>スーファミ・ファミコン・ゲームボーイ（カラー）のROMを開くと、機種を自動で判別して起動します。ファイルは端末内だけで読み込まれます。</p>
-          <button class="tb" id="load2"><span class="blink">▶</span> ROMを開く</button></div>
+        <button class="tapzone" id="load2" aria-label="ROMを開く"></button>
+        <div class="idle-foot"><span>STARTか画面タップでROMを開く</span><span class="sys">SFC · FC · GB · GBC</span></div>
       </div>
     </div>
     <div class="statusbar"><span id="stat">MENUからROMを開けます</span><span id="fps"></span></div>
@@ -154,6 +155,7 @@ body.imm.land:not(.gp) .padhint{display:block;position:fixed;z-index:3;left:50%;
     <div class="dpad" id="dpad">
       <span class="arm h"></span><span class="arm v"></span><span class="hub"></span>
       <span class="ar up">▲</span><span class="ar dn">▼</span><span class="ar lf">◀</span><span class="ar rt">▶</span>
+      <span class="dg ul">◤</span><span class="dg ur">◥</span><span class="dg dl">◣</span><span class="dg dr">◢</span>
     </div>
     <div class="well">
       <button class="key x" data-k="X">X</button><button class="key y" data-k="Y">Y</button>
@@ -3676,23 +3678,28 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
     el.addEventListener('contextmenu', e => e.preventDefault());
   });
+  document.querySelector('[data-k="START"]').addEventListener('click', () => { if (!sys) pick(); });
+  addEventListener('keydown', e => { if (!sys && e.code === 'Enter' && $('menu').hidden) pick(); });
   const dpad = $('dpad'); const DIRS = BITS.UP | BITS.DOWN | BITS.LEFT | BITS.RIGHT;
+  let dpadRect = null;
   const dpadSet = e => {
-    const r = dpad.getBoundingClientRect(); const x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
-    const dz = r.width * 0.12; let b = 0;
+    const r = dpadRect || dpad.getBoundingClientRect(); const x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+    const dz = r.width * 0.1; let b = 0;
     if (Math.hypot(x, y) > dz) {
-      const a = Math.atan2(y, x) * 180 / Math.PI; // -180..180, 0 = right
-      if (a > -67.5 && a < 67.5) b |= BITS.RIGHT;
-      if (a > 112.5 || a < -112.5) b |= BITS.LEFT;
-      if (a > 22.5 && a < 157.5) b |= BITS.DOWN;
-      if (a < -22.5 && a > -157.5) b |= BITS.UP;
+      const a = Math.atan2(y, x) * 180 / Math.PI; // -180..180, 0 = right; diagonals 55°, straight 35°
+      if (a > -72.5 && a < 72.5) b |= BITS.RIGHT;
+      if (a > 107.5 || a < -107.5) b |= BITS.LEFT;
+      if (a > 17.5 && a < 162.5) b |= BITS.DOWN;
+      if (a < -17.5 && a > -162.5) b |= BITS.UP;
     }
     touchBits = (touchBits & ~DIRS) | b;
     dpad.className = 'dpad' + (b & BITS.UP ? ' u' : '') + (b & BITS.DOWN ? ' d' : '') + (b & BITS.LEFT ? ' l' : '') + (b & BITS.RIGHT ? ' r' : '');
+    dpad.style.setProperty('--rx', ((b & BITS.UP) ? 9 : (b & BITS.DOWN) ? -9 : 0) + 'deg');
+    dpad.style.setProperty('--ry', ((b & BITS.RIGHT) ? 9 : (b & BITS.LEFT) ? -9 : 0) + 'deg');
     syncPad();
   };
-  const dpadUp = () => { touchBits &= ~DIRS; dpad.className = 'dpad'; syncPad(); };
-  dpad.addEventListener('pointerdown', e => { e.preventDefault(); dpad.setPointerCapture?.(e.pointerId); dpadSet(e); });
+  const dpadUp = () => { touchBits &= ~DIRS; dpadRect = null; dpad.className = 'dpad'; dpad.style.setProperty('--rx', '0deg'); dpad.style.setProperty('--ry', '0deg'); syncPad(); };
+  dpad.addEventListener('pointerdown', e => { e.preventDefault(); dpadRect = dpad.getBoundingClientRect(); dpad.setPointerCapture?.(e.pointerId); dpadSet(e); });
   dpad.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') dpadSet(e); });
   dpad.addEventListener('pointerup', dpadUp); dpad.addEventListener('pointercancel', dpadUp);
   $('deck').addEventListener('touchmove', e => e.preventDefault(), { passive: false });
@@ -3873,76 +3880,71 @@ if (typeof module !== 'undefined') module.exports = SevenZ;
     try { localStorage.setItem('sfc-scan', on ? '1' : '0'); } catch (e) { }
   };
   (function idleArt() {
-    const c = $('idlecv'), g = c.getContext('2d'), W = 256, H = 224, HZ = 132;
+    const c = $('idlecv'), g = c.getContext('2d'), W = 256, H = 224;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const R = (col, x, y, w, h) => { g.fillStyle = col; g.fillRect(x | 0, y | 0, w, h); };
-    const sky = ['#05071a', '#080b22', '#0b0f2b', '#0f1434', '#13193d', '#171f47', '#1c2551', '#222c5c', '#293467', '#313d72', '#3a467c', '#45508a'];
-    const stars = Array.from({ length: 56 }, (_, i) => ({ x: (i * 97 + 13) % W, y: (i * 41 + 7) % 104, p: i % 9, big: i % 11 === 0 }));
-    const ridge = (seed, amp, base, x) => base - Math.round(amp * (0.55 * Math.sin(x * 0.031 + seed) + 0.3 * Math.sin(x * 0.083 + seed * 2.1) + 0.15 * Math.sin(x * 0.19 + seed * 3.7)));
-    const floor = g.createImageData(W, H - HZ), f32 = new Uint32Array(floor.data.buffer);
-    const rgb = h => { const n = parseInt(h.slice(1), 16); return 0xFF000000 | ((n & 255) << 16) | (n & 0xFF00) | (n >> 16); };
-    const FA = [rgb('#1b4a52'), rgb('#22606a')], FB = [rgb('#122f37'), rgb('#173b44')], FOG = rgb('#45508a');
-    const Q = ['0011111100', '0111111110', '1110000111', '1100000011', '0000000111', '0000001110', '0000011100', '0000111000', '0000110000', '0000110000', '0000000000', '0000110000', '0000110000'];
-    let t = 0;
-    function cart(cx, cy) {
-      const O = '#14161c', P0 = '#f4f0e6', P1 = '#e4ddcc', P2 = '#d2c9b4', P3 = '#b3a990', P4 = '#8f866f';
-      R(O, cx + 4, cy, 64, 1); R(O, cx + 2, cy + 1, 2, 1); R(O, cx + 68, cy + 1, 2, 1); R(O, cx + 1, cy + 2, 1, 2); R(O, cx + 70, cy + 2, 1, 2);
-      R(O, cx, cy + 4, 1, 54); R(O, cx + 71, cy + 4, 1, 54); R(O, cx + 1, cy + 58, 70, 2);
-      R(P1, cx + 4, cy + 1, 64, 1); R(P1, cx + 2, cy + 2, 68, 2); R(P1, cx + 1, cy + 4, 70, 54);
-      R(P0, cx + 4, cy + 1, 60, 1); R(P0, cx + 2, cy + 2, 2, 2); R(P0, cx + 1, cy + 4, 2, 50);
-      R(P2, cx + 60, cy + 4, 8, 50); R(P3, cx + 68, cy + 3, 3, 55); R(P3, cx + 3, cy + 52, 66, 3); R(P4, cx + 1, cy + 55, 70, 3);
-      for (let i = 0; i < 4; i++) { R(P3, cx + 10, cy + 4 + i * 3, 52, 1); R(P0, cx + 10, cy + 5 + i * 3, 52, 1); }
-      R(O, cx + 8, cy + 17, 56, 1); R(O, cx + 8, cy + 47, 56, 1); R(O, cx + 7, cy + 18, 1, 29); R(O, cx + 64, cy + 18, 1, 29);
-      const lab = ['#6a7186', '#5d6477', '#545a69', '#4a5060', '#424756', '#3b404d', '#353946'];
-      for (let i = 0; i < 29; i++) R(lab[Math.min(6, (i / 4) | 0)], cx + 8, cy + 18 + i, 56, 1);
-      R('#f39a80', cx + 8, cy + 18, 56, 1); R('#e0573a', cx + 8, cy + 19, 56, 5); R('#a93c25', cx + 8, cy + 24, 56, 1);
-      for (let x = 0; x < 56; x += 2) R('#c84a30', cx + 8 + x, cy + 23, 1, 1);
-      Q.forEach((row, y) => [...row].forEach((v, x) => { if (v === '1') { R('#14161c', cx + 32 + x, cy + 28 + y, 1, 1); R('#f5f0e4', cx + 31 + x, cy + 27 + y, 1, 1); } }));
-      R('#7a8196', cx + 9, cy + 25, 1, 21);
+    const F = {
+      C: ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'], L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+      A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'], U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+      D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'], E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+      S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'], F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+      P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'], R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+      T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'], ' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....'],
+    };
+    // draw a word with outline + per-row shading (16-bit title style)
+    function word(text, x, y, s, shades, outline) {
+      const glyphs = [...text].map(ch => F[ch]);
+      const pts = [];
+      glyphs.forEach((gl, i) => gl.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '#') pts.push([x + (i * 6 + rx) * s, y + ry * s, ry]); })));
+      g.fillStyle = '#000'; pts.forEach(([px, py]) => g.fillRect(px + 2, py + 2, s, s));          // drop shadow
+      g.fillStyle = outline; pts.forEach(([px, py]) => g.fillRect(px - 1, py - 1, s + 2, s + 2));   // outline
+      pts.forEach(([px, py, ry]) => { g.fillStyle = shades[Math.min(shades.length - 1, ry)]; g.fillRect(px, py, s, s); });
+      pts.forEach(([px, py, ry]) => { if (ry === 0) { g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(px, py, s, 1); } });
     }
+    const wordW = (t, s) => (t.length * 6 - 1) * s;
+    const stars = Array.from({ length: 70 }, (_, i) => ({ x: (i * 73 + 17) % W, y: (i * 47 + 11) % H, p: i % 11, d: 1 + (i % 3) }));
+    const CREAM = ['#ffffff', '#fbf8f1', '#f1ece0', '#e3dccb', '#cfc6b0', '#b5aa90', '#968b72'];
+    const RED = ['#ffd2c6', '#ff9a84', '#f2604a', '#e0402f', '#c4301f', '#a52317', '#7e170e'];
+    const BARS = ['#d8322c', '#f2c41f', '#2f9a4c', '#2f55c8'];
+    let t = reduce ? 400 : 0;
+    const ease = k => 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
     function frame() {
       if ($('idle').hidden) return;
       requestAnimationFrame(frame);
       t++;
-      if (t % 2) return;
-      // sky bands with checker dither seams
-      const bh = Math.ceil(HZ / sky.length);
-      sky.forEach((col, i) => R(col, 0, i * bh, W, bh));
-      for (let i = 1; i < sky.length; i++) { const y = i * bh; g.fillStyle = sky[i]; for (let x = 0; x < W; x += 2) { g.fillRect(x, y - 2, 1, 1); g.fillRect(x + 1, y - 1, 1, 1); } g.fillStyle = sky[i - 1]; for (let x = 0; x < W; x += 2) g.fillRect(x + 1, y, 1, 1); }
-      stars.forEach(st => {
-        const ph = ((t >> 3) + st.p) % 9;
-        const col = ph === 0 ? '#ffffff' : ph < 3 ? '#c9cdf0' : ph < 6 ? '#7d84b8' : '#4a5287';
-        R(col, st.x, st.y, 1, 1);
-        if (st.big && ph < 2) { R('#7d84b8', st.x - 1, st.y, 1, 1); R('#7d84b8', st.x + 1, st.y, 1, 1); R('#7d84b8', st.x, st.y - 1, 1, 1); R('#7d84b8', st.x, st.y + 1, 1, 1); }
+      // background: deep night bands + slow starfield
+      const bands = ['#05060d', '#070915', '#0a0d1e', '#0d1128', '#111633', '#151b3d'];
+      const bh = Math.ceil(H / bands.length);
+      bands.forEach((col, i) => R(col, 0, i * bh, W, bh));
+      for (let i = 1; i < bands.length; i++) { g.fillStyle = bands[i]; for (let x = (i & 1); x < W; x += 2) g.fillRect(x, i * bh - 1, 1, 1); }
+      stars.forEach(s => {
+        const y = reduce ? s.y : (s.y + t * 0.04 * s.d) % H, ph = ((t >> 3) + s.p) % 11;
+        R(ph === 0 ? '#ffffff' : ph < 4 ? '#9aa1cf' : '#3c4372', s.x, y, 1, 1);
       });
-      // parallax mountains
-      const s1 = reduce ? 0 : t * 0.05, s2 = reduce ? 0 : t * 0.12;
-      for (let x = 0; x < W; x++) {
-        const y1 = ridge(1.3, 18, 112, x + s1), y2 = ridge(4.1, 12, 126, x + s2);
-        R('#2a3270', x, y1, 1, HZ - y1); R('#4b569a', x, y1, 1, 1);
-        R('#1c2252', x, y2, 1, HZ - y2); R('#323b7a', x, y2, 1, 1);
+      // logo drop
+      const s1 = 5, s2 = 7, w1 = wordW('CLAUDE', s1), w2 = wordW('SFC', s2);
+      const k1 = ease((t - 10) / 40), y1 = -60 + (58 - -60) * k1;
+      if (t > 10) word('CLAUDE', (W - w1) >> 1, Math.round(y1), s1, CREAM, '#14161c');
+      if (t > 46) {
+        const pop = ease((t - 46) / 14), sc = 1 + (1 - pop) * 0.6;
+        g.save(); g.translate(W / 2, 112 + 25); g.scale(sc, sc); g.translate(-W / 2, -(112 + 25));
+        word('SFC', (W - w2) >> 1, 104, s2, RED, '#14161c');
+        g.restore();
+        if (t < 54) { g.fillStyle = 'rgba(255,255,255,' + (0.5 * (1 - (t - 46) / 8)) + ')'; g.fillRect(0, 0, W, H); }
       }
-      // perspective floor (scrolling)
-      const sc = reduce ? 0 : t * 0.6;
-      for (let y = 0; y < H - HZ; y++) {
-        const d = 48 / (y + 2), wz = d * 64 + sc, fog = Math.max(0, 1 - y / 26);
-        for (let x = 0; x < W; x++) {
-          const wx = (x - 128) * d;
-          const chk = ((Math.floor(wx / 10) + Math.floor(wz / 10)) & 1);
-          const line = ((wx % 10 + 10) % 10) < d * 0.9 || ((wz % 10 + 10) % 10) < d * 0.9;
-          let v = line ? FA[1] : (chk ? FA[0] : FB[0]);
-          if ((y < 4 && ((x + y) & 1)) || (y < 10 && (x & 1) && (y & 1)) || (y < 18 && !(x & 3) && !(y & 3))) v = FOG;
-          f32[y * W + x] = v;
-        }
+      // color bars sweep
+      if (t > 62) {
+        const k = ease((t - 62) / 26), full = 116, x0 = (W - full) >> 1;
+        BARS.forEach((col, i) => {
+          const w = Math.round((full / 4) * Math.min(1, Math.max(0, k * 4 - i)));
+          if (w > 0) { R('#000', x0 + i * 29 + 1, 160 + 1, w, 3); R(col, x0 + i * 29, 160, w, 3); R('rgba(255,255,255,.35)', x0 + i * 29, 160, w, 1); }
+        });
       }
-      g.putImageData(floor, 0, HZ);
-      R('#6a76bd', 0, HZ, W, 1);
-      // cartridge + shadow
-      const bob = reduce ? 0 : Math.round(Math.sin(t / 22) * 3);
-      const cx = 92, cy = 18 + bob;
-      g.globalAlpha = .35; R('#000', cx + 8 - bob, 148, 56 + bob * 2, 4); R('#000', cx + 14 - bob, 152, 44 + bob * 2, 2); g.globalAlpha = 1;
-      cart(cx, cy);
-      if (!reduce) { const k = (t >> 2) % 40; if (k < 8) { const sx = cx + 70, sy = cy + 4; const col = k < 4 ? '#ffffff' : '#c9cdf0'; R(col, sx, sy - (k & 3), 1, 1 + 2 * (k & 3)); R(col, sx - (k & 3), sy, 1 + 2 * (k & 3), 1); } }
+      // PRESS START
+      if (t > 92 && ((t >> 4) & 1 || reduce)) {
+        const w = wordW('PRESS START', 2);
+        word('PRESS START', (W - w) >> 1, 174, 2, ['#ffffff', '#f1ece0', '#e3dccb', '#cfc6b0', '#b5aa90', '#968b72', '#7d735e'], '#14161c');
+      }
     }
     frame();
   })();

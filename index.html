@@ -378,7 +378,9 @@ class CPU {
 
   step() {
     if (this.nmiPending) { this.nmiPending = false; this.waiting = false; this.interrupt(0xFFEA, 0xFFFA, false); return; }
-    if (this.irqLine && !(this.P & 4)) { this.waiting = false; this.interrupt(0xFFEE, 0xFFFE, false); return; }
+    const irq = this.irqLine || this.sys.chipIrq;
+    if (irq && !(this.P & 4)) { this.waiting = false; this.interrupt(0xFFEE, 0xFFFE, false); return; }
+    if (irq && this.waiting) this.waiting = false;   // WAI resumes on IRQ even when masked
     if (this.waiting || this.stopped) { this.sys.cyc += 8; return; }
     const op = this.f8();
     const low = op & 0x1F;
@@ -1444,7 +1446,7 @@ class SNES {
     this.apu = new APU();
     this.cpu = new CPU(this);
     this.dmaR = new Uint8Array(0x80);
-    this.hdmaDo = new Uint8Array(8); this.hdmaTerm = new Uint8Array(8);
+    this.hdmaDo = new Uint8Array(8); this.hdmaTerm = new Uint8Array(8); this.dmaCnt = new Int32Array(8); this.dmaIdx = new Int32Array(8); this.dmaPending = 0;
     this.pad = [0, 0];
     this.rom = null; this.sram = new Uint8Array(0);
     this.sramDirty = false;
@@ -1467,12 +1469,22 @@ class SNES {
       return s;
     };
     this.hirom = score(0xFFC0) > score(0x7FC0);
+    if (d.length >= 0x8000 && (d[0x7FD5] === 0x23 || d[0x7FD5] === 0x32 || ((d[0x7FD6] === 0x13 || d[0x7FD6] === 0x14 || d[0x7FD6] === 0x15 || d[0x7FD6] === 0x1A) && (d[0x7FD5] & 0xEF) === 0x20))) this.hirom = false;
     const hb = this.hirom ? 0xFFC0 : 0x7FC0;
+    this.mapMode = d[hb + 0x15]; this.cartType = d[hb + 0x16];
     this.title = String.fromCharCode(...d.subarray(hb, hb + 21)).replace(/[^\x20-\x7E]/g, '').trim() || 'GAME';
     const ss = d[hb + 0x18];
     this.sram = new Uint8Array(ss > 0 && ss < 12 ? (1024 << ss) : 0);
     this.sram.fill(0xFF);
     this.romMask = this.rom.length;
+    this.chip = null; this.chipName = '';
+    const ct = this.cartType;
+    if ((ct >= 0x03 && ct <= 0x05) && typeof Dsp1 !== 'undefined') { this.chip = new Dsp1(this); this.chipName = 'DSP-1'; }
+    else if ((ct === 0x34 || ct === 0x35) && (this.mapMode & 0x0F) === 3) { if (typeof SA1 === 'undefined') throw new Error('SA-1チップのソフトはまだ未対応です'); this.chip = new SA1(this); this.chipName = 'SA-1'; }
+    else if ((ct >= 0x13 && ct <= 0x15) || ct === 0x1A) { if (typeof GSU === 'undefined') throw new Error('スーパーFXチップのソフトはまだ未対応です'); this.chip = new GSU(this); this.chipName = 'SuperFX'; }
+    else if (ct === 0xF3) { if (typeof Cx4 === 'undefined') throw new Error('Cx4チップのソフトはまだ未対応です'); this.chip = new Cx4(this); this.chipName = 'Cx4'; }
+    else if (ct === 0x43 || ct === 0x45) { if (typeof SDD1 === 'undefined') throw new Error('S-DD1チップのソフトはまだ未対応です'); this.chip = new SDD1(this); this.chipName = 'S-DD1'; }
+    if (this.chip && this.chip.sram) this.sram = this.chip.sram;
     this.reset();
   }
   reset() {
@@ -1481,7 +1493,8 @@ class SNES {
     this.wrmpya = 0xFF; this.wrdiv = 0xFFFF; this.rddiv = 0; this.rdmpy = 0;
     this.nmiFlag = false; this.irqFlag = false; this.autoJoy = [0, 0];
     this.joyLatch = 0; this.joyShift = [0, 0]; this.wmAddr = 0; this.mdr = 0;
-    this.cyc = 0; this.line = 0; this.frameMaster = 0; this.irqTarget = -1; this.nmiDelayed = false;
+    this.cyc = 0; this.line = 0; this.frameMaster = 0; this.irqTarget = -1; this.nmiDelayed = false; this.chipIrq = false; this.dmaPending = 0;
+    if (this.chip && this.chip.reset) this.chip.reset();
     this.cpu.reset();
   }
   romRead(bank, off) {
@@ -1507,6 +1520,7 @@ class SNES {
   read(a) {
     const bank = a >>> 16, off = a & 0xFFFF;
     if (bank === 0x7E || bank === 0x7F) { this.cyc += 8; return this.mdr = this.wram[a - 0x7E0000]; }
+    if (this.chip) { const cv = this.chip.read(a); if (cv >= 0) { this.cyc += 8; return this.mdr = cv; } }
     if ((bank & 0x40) === 0) {
       if (off < 0x2000) { this.cyc += 8; return this.mdr = this.wram[off]; }
       if (off >= 0x8000) { this.cyc += ((bank & 0x80) && (this.memsel & 1)) ? 6 : 8; return this.mdr = this.romRead(bank, off); }
@@ -1531,6 +1545,7 @@ class SNES {
     const bank = a >>> 16, off = a & 0xFFFF;
     this.mdr = v;
     if (bank === 0x7E || bank === 0x7F) { this.cyc += 8; this.wram[a - 0x7E0000] = v; return; }
+    if (this.chip && this.chip.write(a, v)) { this.cyc += 8; return; }
     if ((bank & 0x40) === 0) {
       if (off < 0x2000) { this.cyc += 8; this.wram[off] = v; return; }
       if (off >= 0x8000) { this.cyc += 8; return; }
@@ -1623,31 +1638,42 @@ class SNES {
     if (lineStart || t > this.cyc) this.irqTarget = t;
   }
   doDMA(mask) {
-    for (let c = 0; c < 8; c++) {
-      if (!(mask & (1 << c))) continue;
-      const b = c << 4, r = this.dmaR;
-      const params = r[b], bAddr = r[b + 1];
+    // general-purpose DMA runs in real time (CPU halted); HDMA on the same channel cancels it
+    const r = this.dmaR;
+    const ch = this.chip && this.chip.dmaBegin ? this.chip : null;
+    for (let c = 0; c < 8; c++) if (mask & (1 << c)) {
+      const b = c << 4; this.dmaCnt[c] = (r[b + 5] | (r[b + 6] << 8)) || 0x10000; this.dmaIdx[c] = 0;
+      if (ch) ch.dmaBegin(c, (r[b + 4] << 16) | r[b + 2] | (r[b + 3] << 8), this.dmaCnt[c]);
+    }
+    this.dmaPending |= mask; this.cyc += 8;
+  }
+  dmaStep(limit) {
+    const r = this.dmaR;
+    while (this.dmaPending && this.cyc < limit) {
+      let c = 0; while (!(this.dmaPending & (1 << c))) c++;
+      const b = c << 4, params = r[b], bAddr = r[b + 1];
       let aAddr = r[b + 2] | (r[b + 3] << 8);
-      const aBank = r[b + 4] << 16;
-      let count = r[b + 5] | (r[b + 6] << 8); if (count === 0) count = 0x10000;
-      const pat = DMA_PAT[params & 7], plen = pat.length;
+      const aBank = r[b + 4] << 16, pat = DMA_PAT[params & 7], plen = pat.length;
       const dir = params & 0x80, fixed = params & 8, step = (params & 0x10) ? -1 : 1;
-      let i = 0;
-      this.cyc += 8;
-      while (count > 0) {
+      let count = this.dmaCnt[c], i = this.dmaIdx[c];
+      const dc = !dir && this.chip && this.chip.dmaOn && this.chip.dmaOn(c) ? this.chip : null;
+      while (count > 0 && this.cyc < limit) {
         const br = (bAddr + pat[i % plen]) & 0xFF;
-        if (!dir) { const v = this.dmaReadA(aBank | aAddr); this.writeB(br, v); }
+        if (!dir) { const v = dc ? dc.dmaByte(c, aBank | aAddr) : this.dmaReadA(aBank | aAddr); this.writeB(br, v); }
         else { const v = this.readB(br); this.dmaWriteA(aBank | aAddr, v); }
         if (!fixed) aAddr = (aAddr + step) & 0xFFFF;
         count--; i++; this.cyc += 8;
       }
-      r[b + 2] = aAddr & 0xFF; r[b + 3] = aAddr >> 8; r[b + 5] = 0; r[b + 6] = 0;
+      r[b + 2] = aAddr & 0xFF; r[b + 3] = aAddr >> 8; r[b + 5] = count & 0xFF; r[b + 6] = (count >> 8) & 0xFF;
+      this.dmaCnt[c] = count; this.dmaIdx[c] = i;
+      if (count <= 0) this.dmaPending &= ~(1 << c);
     }
   }
   dmaReadA(a) { const c = this.cyc; const off = a & 0xFFFF; let v; if (!((a >>> 16) & 0x40) && off >= 0x2100 && off < 0x2200) v = this.mdr; else v = this.read(a); this.cyc = c; return v; }
   dmaWriteA(a, v) { const c = this.cyc; const off = a & 0xFFFF; if (!(!((a >>> 16) & 0x40) && off >= 0x2100 && off < 0x2200)) this.write(a, v); this.cyc = c; }
   hdmaInit() {
     const r = this.dmaR;
+    this.dmaPending &= ~this.hdmaen;
     for (let c = 0; c < 8; c++) {
       this.hdmaDo[c] = 0; this.hdmaTerm[c] = 1;
       if (!(this.hdmaen & (1 << c))) continue;
@@ -1674,6 +1700,7 @@ class SNES {
   }
   hdmaRun() {
     const r = this.dmaR;
+    for (let c = 0; c < 8; c++) if ((this.hdmaen & (1 << c)) && !this.hdmaTerm[c]) this.dmaPending &= ~(1 << c);
     for (let c = 0; c < 8; c++) {
       if (!(this.hdmaen & (1 << c)) || this.hdmaTerm[c]) continue;
       const b = c << 4;
@@ -1697,7 +1724,7 @@ class SNES {
     }
   }
   runFrame() {
-    const cpu = this.cpu, ppu = this.ppu;
+    const cpu = this.cpu, ppu = this.ppu, chip = this.chip;
     for (let line = 0; line < LINES; line++) {
       this.line = line;
       if (line === 0) {
@@ -1717,16 +1744,24 @@ class SNES {
       while (this.cyc < MASTER_PER_LINE) {
         if (this.irqTarget >= 0 && this.cyc >= this.irqTarget) { this.irqFlag = true; cpu.irqLine = true; this.irqTarget = -1; }
         if (!hdmaDone && this.cyc >= 1104) { hdmaDone = true; this.hdmaRun(); }
-        if (cpu.waiting && !cpu.nmiPending && !cpu.irqLine) {
+        if (this.dmaPending) {
+          this.dmaStep(hdmaDone ? MASTER_PER_LINE : 1104);
+          if (chip && chip.sync) chip.sync(this.frameMaster + this.cyc);
+          continue;
+        }
+        if (cpu.waiting && !cpu.nmiPending && !cpu.irqLine && !this.chipIrq) {
           let next = MASTER_PER_LINE;
           if (this.irqTarget >= 0 && this.irqTarget < next) next = this.irqTarget;
           if (!hdmaDone && next > 1104) next = 1104;
+          if (chip && chip.sync) next = Math.min(next, this.cyc + 64);
           this.cyc = Math.max(this.cyc + 2, next);
+          if (chip && chip.sync) chip.sync(this.frameMaster + this.cyc);
           continue;
         }
         const fireNmi = this.nmiDelayed; this.nmiDelayed = false;
         cpu.step();
         if (fireNmi) cpu.nmiPending = true;
+        if (chip && chip.sync) chip.sync(this.frameMaster + this.cyc);
       }
       if (!hdmaDone) this.hdmaRun();
       this.syncAPU();
@@ -1736,6 +1771,7 @@ class SNES {
     // rebase APU clock
     const spcFrame = this.frameMaster / APU_RATIO;
     this.apu.cycles -= spcFrame;
+    if (chip && chip.rebase) chip.rebase(this.frameMaster);
     this.frameMaster = 0;
   }
 }
@@ -1774,6 +1810,7 @@ SNES.prototype.saveState = function () {
     snes: snapObj(this, STATE_SKIP.snes), cpu: snapObj(this.cpu, STATE_SKIP.cpu), ppu: snapObj(this.ppu, STATE_SKIP.ppu),
     apu: snapObj(this.apu, STATE_SKIP.apu), dsp: snapObj(this.apu.dsp, STATE_SKIP.dsp),
     voices: this.apu.dsp.voices.map(v => snapObj(v, [])),
+    chip: this.chip && this.chip.saveState ? this.chip.saveState() : null,
   };
 };
 SNES.prototype.loadState = function (st) {
@@ -1781,6 +1818,7 @@ SNES.prototype.loadState = function (st) {
   restoreObj(this, st.snes); restoreObj(this.cpu, st.cpu); restoreObj(this.ppu, st.ppu);
   restoreObj(this.apu, st.apu); restoreObj(this.apu.dsp, st.dsp);
   st.voices.forEach((v, i) => restoreObj(this.apu.dsp.voices[i], v));
+  if (st.chip && this.chip && this.chip.loadState) this.chip.loadState(st.chip);
   this.ppu.lutBright = -1;
   const d = this.apu.dsp; d.rpos = d.wpos;
 };
@@ -1815,7 +1853,7 @@ function decodeState(str) {
 Object.defineProperties(SNES.prototype, {
   system: { get() { return 'sfc'; } }, width: { get() { return 256; } }, height: { get() { return 224; } }, fps: { get() { return 60.0988; } },
   image: { get() { return this.ppu.image; } }, audio: { get() { return this.apu.dsp; } },
-  label: { get() { return 'SFC · ' + (this.hirom ? 'HiROM' : 'LoROM'); } },
+  label: { get() { return 'SFC · ' + (this.hirom ? 'HiROM' : 'LoROM') + (this.chipName ? ' · ' + this.chipName : ''); } },
 });
 if (typeof module !== 'undefined') module.exports = { SNES, encodeState, decodeState };
 // ===== Famicom / NES =====
@@ -3219,6 +3257,1374 @@ class GB {
     restoreObj(this, st.sys); restoreObj(this.apu, st.apu);
     ['c1', 'c2', 'c3', 'c4'].forEach((k, i) => Object.assign(this.apu[k], st.ch[i]));
     this.apu.rpos = this.apu.wpos;
+  }
+}
+// ===== DSP-1 (HLE: commands reproduced mathematically) =====
+const S16 = v => { v = Math.round(v); if (v > 32767) v = 32767; else if (v < -32768) v = -32768; return v; };
+const sx16 = v => (v << 16) >> 16;
+const ANG = a => sx16(a) * Math.PI / 32768;       // 0x10000 = 360°
+const DSP1_IO = {
+  0x00: [2, 1], 0x20: [2, 1], 0x10: [2, 2], 0x30: [2, 2], 0x04: [2, 2], 0x24: [2, 2], 0x08: [3, 2], 0x18: [4, 1], 0x38: [4, 1],
+  0x28: [3, 1], 0x0C: [3, 2], 0x2C: [3, 2], 0x1C: [6, 3], 0x3C: [6, 3], 0x02: [7, 4], 0x12: [7, 4], 0x22: [7, 4], 0x32: [7, 4],
+  0x0A: [1, 4], 0x1A: [1, 4], 0x2A: [1, 4], 0x3A: [1, 4], 0x06: [3, 3], 0x16: [3, 3], 0x26: [3, 3], 0x36: [3, 3],
+  0x0E: [2, 2], 0x1E: [2, 2], 0x2E: [2, 2], 0x3E: [2, 2], 0x01: [4, 0], 0x05: [4, 0], 0x31: [4, 0], 0x35: [4, 0], 0x11: [4, 0], 0x15: [4, 0],
+  0x21: [4, 0], 0x25: [4, 0], 0x0D: [3, 3], 0x09: [3, 3], 0x39: [3, 3], 0x3D: [3, 3], 0x1D: [3, 3], 0x19: [3, 3], 0x2D: [3, 3], 0x29: [3, 3],
+  0x03: [3, 3], 0x33: [3, 3], 0x13: [3, 3], 0x23: [3, 3], 0x0B: [3, 1], 0x3B: [3, 1], 0x1B: [3, 1], 0x2B: [3, 1], 0x14: [6, 3], 0x34: [6, 3],
+  0x07: [1, 1], 0x0F: [1, 1], 0x27: [1, 1], 0x2F: [1, 1], 0x17: [1, 1024], 0x37: [1, 1024], 0x3F: [1, 1024], 0x1F: [1, 1024],
+};
+class Dsp1 {
+  constructor(snes) {
+    this.snes = snes;
+    const big = snes.rom.length > 0x100000;
+    this.map = snes.hirom ? 2 : big ? 1 : 0;
+    this.reset();
+  }
+  reset() {
+    this.state = 0; this.cmd = -1; this.inp = []; this.need = 0; this.out = []; this.outPos = 0; this.half = 0; this.latch = 0;
+    this.mat = [[[0, 0, 0], [0, 0, 0], [0, 0, 0]], [[0, 0, 0], [0, 0, 0], [0, 0, 0]], [[0, 0, 0], [0, 0, 0], [0, 0, 0]]];
+    this.p = { Cx: 0, Cy: 0, Hc: 1, Les: 1, Aas: 0, Azs: 0, camX: 0, camY: 0, camZ: 0, Gx: 0, Gy: 0, Gz: 0, rasterVs: 0 };
+  }
+  // address decode: returns 0 = DR, 1 = SR, -1 = not ours
+  decode(a) {
+    const bank = (a >>> 16) & 0x7F, off = a & 0xFFFF;
+    if (this.map === 0) { if (bank >= 0x30 && bank < 0x40 && off >= 0x8000) return off < 0xC000 ? 0 : 1; }
+    else if (this.map === 1) { if (bank >= 0x60 && bank < 0x70 && off < 0x8000) return off < 0x4000 ? 0 : 1; }
+    else if (bank < 0x20 && off >= 0x6000 && off < 0x8000) return off < 0x7000 ? 0 : 1;
+    return -1;
+  }
+  read(a) {
+    const r = this.decode(a); if (r < 0) return -1;
+    if (r === 1) return 0x80;
+    if (this.state !== 2) return 0x80;
+    const w = this.out[this.outPos] & 0xFFFF;
+    if (!this.half) { this.half = 1; return w & 0xFF; }
+    this.half = 0; this.outPos++;
+    if (this.outPos >= this.out.length) {
+      if ((this.cmd & 0x0F) === 0x0A) { this.p.rasterVs = sx16(this.p.rasterVs + 1); this.out = this.raster(this.p.rasterVs); this.outPos = 0; }
+      else { this.state = 0; this.cmd = -1; }
+    }
+    return w >> 8;
+  }
+  write(a, v) {
+    const r = this.decode(a); if (r < 0) return false;
+    if (r === 1) return true;
+    if (this.state !== 1) {                 // waiting for a command (a write while outputting also starts a new command)
+      if (v & 0x80) return true;
+      this.cmd = v & 0x3F; const io = DSP1_IO[this.cmd] || [0, 0];
+      this.need = io[0]; this.inp = []; this.half = 0; this.out = []; this.outPos = 0;
+      if (this.need) this.state = 1; else this.exec();
+      return true;
+    }
+    if (!this.half) { this.latch = v; this.half = 1; return true; }
+    this.half = 0; this.inp.push(sx16(this.latch | (v << 8)));
+    if (this.inp.length >= this.need) this.exec();
+    return true;
+  }
+  sin(a) { return Math.sin(ANG(a)); }
+  cos(a) { return Math.cos(ANG(a)); }
+  exec() {
+    const c = this.cmd, I = this.inp; let O = [];
+    const base = c & 0x0F, grp = c >> 4;
+    switch (c) {
+      case 0x00: O = [S16((I[0] * I[1]) >> 15)]; break;
+      case 0x20: O = [S16(((I[0] * I[1]) >> 15) + 1)]; break;
+      case 0x10: case 0x30: O = this.inverse(I[0], I[1]); break;
+      case 0x04: case 0x24: O = [S16(this.sin(I[0]) * I[1]), S16(this.cos(I[0]) * I[1])]; break;
+      case 0x08: { const s = (I[0] * I[0] + I[1] * I[1] + I[2] * I[2]) * 2; O = [s & 0xFFFF, (s / 65536) & 0xFFFF]; break; }
+      case 0x18: O = [S16((I[0] * I[0] + I[1] * I[1] + I[2] * I[2] - I[3] * I[3]) / 32768)]; break;
+      case 0x38: O = [S16((I[0] * I[0] + I[1] * I[1] + I[2] * I[2] - I[3] * I[3]) / 32768 + 1)]; break;
+      case 0x28: O = [S16(Math.sqrt(I[0] * I[0] + I[1] * I[1] + I[2] * I[2]))]; break;
+      case 0x0C: case 0x2C: { const s = this.sin(I[0]), co = this.cos(I[0]); O = [S16(I[2] * s + I[1] * co), S16(I[2] * co - I[1] * s)]; break; }
+      case 0x1C: case 0x3C: {
+        const [az, ay, ax, X, Y, Z] = I;
+        let x1 = X * this.cos(az) + Y * this.sin(az), y1 = -X * this.sin(az) + Y * this.cos(az), z1 = Z;
+        let x2 = x1 * this.cos(ay) - z1 * this.sin(ay), z2 = x1 * this.sin(ay) + z1 * this.cos(ay);
+        let y3 = y1 * this.cos(ax) + z2 * this.sin(ax), z3 = -y1 * this.sin(ax) + z2 * this.cos(ax);
+        O = [S16(x2), S16(y3), S16(z3)]; break;
+      }
+      case 0x02: case 0x12: case 0x22: case 0x32: O = this.parameter(I); break;
+      case 0x0A: case 0x1A: case 0x2A: case 0x3A: this.p.rasterVs = I[0]; O = this.raster(I[0]); break;
+      case 0x06: case 0x16: case 0x26: case 0x36: O = this.project(I); break;
+      case 0x0E: case 0x1E: case 0x2E: case 0x3E: O = this.target(I[0], I[1]); break;
+      case 0x01: case 0x05: case 0x31: case 0x35: this.attitude(0, I); break;
+      case 0x11: case 0x15: this.attitude(1, I); break;
+      case 0x21: case 0x25: this.attitude(2, I); break;
+      case 0x0D: case 0x09: case 0x39: case 0x3D: O = this.objective(0, I); break;
+      case 0x1D: case 0x19: O = this.objective(1, I); break;
+      case 0x2D: case 0x29: O = this.objective(2, I); break;
+      case 0x03: case 0x33: O = this.subjective(0, I); break;
+      case 0x13: O = this.subjective(1, I); break;
+      case 0x23: O = this.subjective(2, I); break;
+      case 0x0B: case 0x3B: O = [this.scalar(0, I)]; break;
+      case 0x1B: O = [this.scalar(1, I)]; break;
+      case 0x2B: O = [this.scalar(2, I)]; break;
+      case 0x14: case 0x34: O = this.gyrate(I); break;
+      case 0x07: case 0x0F: O = [0]; break;
+      case 0x27: case 0x2F: O = [0x0100]; break;
+      case 0x17: case 0x37: case 0x3F: case 0x1F: O = new Array(1024).fill(0); break;
+      default: O = [];
+    }
+    this.out = O; this.outPos = 0; this.half = 0;
+    if (O.length) this.state = 2; else { this.state = 0; this.cmd = -1; }
+  }
+  inverse(a, b) {
+    if (a === 0) return [0x7FFF, 0x002F];
+    let v = 1 / ((a / 32768) * Math.pow(2, b)), e = 0;
+    const neg = v < 0; v = Math.abs(v);
+    while (v >= 1) { v /= 2; e++; }
+    while (v < 0.5) { v *= 2; e--; }
+    let coef = Math.min(32767, Math.round(v * 32768)); if (neg) coef = -coef;
+    return [coef, e & 0xFFFF];
+  }
+  // ---- projection (camera looks from F + Lfe*N toward F; screen at Les from the camera) ----
+  parameter(I) {
+    const [Fx, Fy, Fz, Lfe, Les, Aas, Azs] = I, p = this.p;
+    const sa = this.sin(Aas), ca = this.cos(Aas);
+    let az = ANG(Azs);
+    const lim = 1.55; if (az > lim) az = lim; if (az < -lim) az = -lim;
+    const sz = Math.sin(az), cz = Math.cos(az);
+    const N = [-sa * sz, ca * sz, cz];
+    p.camX = Fx + Lfe * N[0]; p.camY = Fy + Lfe * N[1]; p.camZ = Fz + Lfe * N[2];
+    p.Gx = p.camX - Les * N[0]; p.Gy = p.camY - Les * N[1]; p.Gz = p.camZ - Les * N[2];
+    p.sa = sa; p.ca = ca; p.sz = sz; p.cz = cz; p.Les = Les || 1; p.Hc = p.camZ;
+    const t = p.camZ * (cz ? sz / cz : 0);
+    p.Cx = p.camX + t * sa; p.Cy = p.camY - t * ca;
+    const vva = sz ? -p.Les * cz / sz : -32768;
+    return [0, S16(vva), S16(p.Cx), S16(p.Cy)];
+  }
+  lineScale(vs) {
+    const p = this.p, den = p.Les * p.cz + vs * p.sz;
+    if (Math.abs(den) < 1e-6) return 0x7FFF;
+    return p.Hc / den;
+  }
+  raster(vs) {
+    const p = this.p, c = this.lineScale(vs), sec = p.cz ? 1 / p.cz : 0;
+    return [S16(c * p.ca * 256), S16(-c * sec * p.sa * 256), S16(c * p.sa * 256), S16(c * sec * p.ca * 256)];
+  }
+  project(I) {
+    const p = this.p;
+    const Px = I[0] - p.camX, Py = I[1] - p.camY, Pz = I[2] - p.camZ;
+    const ax = p.sa * p.sz, ay = -p.ca * p.sz, az = -p.cz;            // view axis
+    const rx = p.ca, ry = p.sa;                                       // screen right
+    const dx = -p.sa * p.cz, dy = p.ca * p.cz, dz = -p.sz;            // screen down
+    const depth = Px * ax + Py * ay + Pz * az;
+    if (depth <= 1) return [0, 224, 0xFFFF];
+    const k = p.Les / depth;
+    return [S16((Px * rx + Py * ry) * k), S16((Px * dx + Py * dy + Pz * dz) * k), Math.min(0xFFFF, Math.round(k * 256)) & 0xFFFF];
+  }
+  target(H, V) {
+    const p = this.p, c = this.lineScale(V), sec = p.cz ? 1 / p.cz : 0;
+    const X = p.Cx + c * (H * p.ca - V * sec * p.sa), Y = p.Cy + c * (H * p.sa + V * sec * p.ca);
+    return [S16(X), S16(Y)];
+  }
+  attitude(n, I) {
+    const m = I[0] / 32768 / 2;
+    const sz = this.sin(I[1]), cz = this.cos(I[1]), sy = this.sin(I[2]), cy = this.cos(I[2]), sx = this.sin(I[3]), cx = this.cos(I[3]);
+    const M = this.mat[n];
+    M[0][0] = m * cz * cy; M[0][1] = -m * sz * cy; M[0][2] = m * sy;
+    M[1][0] = m * (sz * cx + cz * sx * sy); M[1][1] = m * (cz * cx - sz * sx * sy); M[1][2] = -m * sx * cy;
+    M[2][0] = m * (sz * sx - cz * cx * sy); M[2][1] = m * (cz * sx + sz * cx * sy); M[2][2] = m * cx * cy;
+  }
+  objective(n, I) {
+    const M = this.mat[n], [X, Y, Z] = I;
+    return [0, 1, 2].map(r => S16((X * M[r][0] + Y * M[r][1] + Z * M[r][2]) * 2));
+  }
+  subjective(n, I) {
+    const M = this.mat[n], [F, L, U] = I;
+    return [0, 1, 2].map(c => S16((F * M[0][c] + L * M[1][c] + U * M[2][c]) * 2));
+  }
+  scalar(n, I) { const M = this.mat[n]; return S16((I[0] * M[0][0] + I[1] * M[0][1] + I[2] * M[0][2]) * 2); }
+  gyrate(I) {
+    const [Az, Ax, Ay, U, F, L] = I;
+    const ax = ANG(Ax), ay = ANG(Ay), cax = Math.cos(ax) || 1e-6;
+    const sy = Math.sin(ay), cy = Math.cos(ay);
+    const Rz = Az + (U * cy - F * sy) / cax;
+    const Rx = Ax + (U * sy + F * cy);
+    const Ry = Ay - Math.tan(ax) * (U * cy - F * sy) + L;
+    return [sx16(Math.round(Rz)), sx16(Math.round(Rx)), sx16(Math.round(Ry))];
+  }
+  saveState() { return JSON.parse(JSON.stringify({ state: this.state, cmd: this.cmd, inp: this.inp, need: this.need, out: this.out, outPos: this.outPos, half: this.half, latch: this.latch, mat: this.mat, p: this.p })); }
+  loadState(s) { Object.assign(this, JSON.parse(JSON.stringify(s))); }
+}
+// ===== SA-1 (second 65C816 at 10.74 MHz + BW-RAM/I-RAM, MMC, DMA, char conversion, math) =====
+class SA1 {
+  constructor(snes) {
+    this.snes = snes; this.rom = snes.rom;
+    const size = Math.max(0x2000, snes.sram.length || 0x2000);
+    this.bwram = new Uint8Array(size); this.bwram.fill(0); this.sram = this.bwram;
+    this.iram = new Uint8Array(0x800);
+    this.brf = new Uint8Array(16);
+    const self = this;
+    // the SA-1 CPU's private bus (CPU counts 6 units per cycle; one SA-1 cycle = 2 master clocks)
+    this.bus = { cyc: 0, chipIrq: false, read: a => self.sRead(a), write: (a, v) => self.sWrite(a, v) };
+    this.cpu = new CPU(this.bus);
+    this.reset();
+  }
+  reset() {
+    this.iram.fill(0);
+    this.ccnt = 0x20; this.sie = 0; this.crv = 0; this.cnv = 0; this.civ = 0;
+    this.scnt = 0; this.cie = 0; this.snv = 0; this.siv = 0;
+    this.xb = [0, 1, 2, 3]; this.bmaps = 0; this.bmap = 0; this.sbwe = 0; this.cbwe = 0;
+    this.sfrIrq = 0; this.sfrCh = 0; this.cfrIrq = 0; this.cfrTimer = 0; this.cfrDma = 0; this.cfrNmi = 0;
+    this.tmc = 0; this.hcnt = 0; this.vcnt = 0; this.timerFired = -1;
+    this.dcnt = 0; this.cdma = 0; this.sda = 0; this.dda = 0; this.dtc = 0; this.bbf = 0; this.cc2line = 0;
+    this.mcnt = 0; this.ma = 0; this.mb = 0; this.mr = 0; this.of = 0;
+    this.vbd = 0; this.vb = 16; this.va = 0; this.vbit = 0;
+    this.t = 0; this.bus.cyc = 0; this.running = false;
+    this.cpu.A = 0; this.cpu.X = 0; this.cpu.Y = 0; this.cpu.S = 0x1FF; this.cpu.D = 0; this.cpu.DB = 0; this.cpu.PB = 0; this.cpu.P = 0x34; this.cpu.E = 1;
+    this.cpu.waiting = false; this.cpu.stopped = false; this.cpu.nmiPending = false; this.cpu.irqLine = false;
+    this.snes.chipIrq = false;
+  }
+  // ---------- ROM through the Super MMC ----------
+  romRead(bank, off) {
+    let idx;
+    if (bank >= 0xC0) idx = ((this.xb[(bank >> 4) & 3] & 7) << 20) | ((bank & 0x0F) << 16) | off;
+    else {
+      const sel = ((bank & 0x80) ? 2 : 0) | ((bank & 0x20) ? 1 : 0), reg = this.xb[sel];
+      const block = (reg & 0x80) ? (reg & 7) : sel;
+      idx = (block << 20) | ((bank & 0x1F) << 15) | (off & 0x7FFF);
+    }
+    return this.rom[idx % this.rom.length];
+  }
+  bw(i) { return this.bwram[i % this.bwram.length]; }
+  bwSet(i, v) { i %= this.bwram.length; if (this.bwram[i] !== v) { this.bwram[i] = v; this.snes.sramDirty = true; } }
+  bitmapRead(o) {
+    if (this.bbf & 0x80) { const v = this.bw(o >> 2); return (v >> ((o & 3) << 1)) & 3; }
+    const v = this.bw(o >> 1); return (o & 1) ? (v >> 4) : (v & 15);
+  }
+  bitmapWrite(o, v) {
+    if (this.bbf & 0x80) { const i = o >> 2, sh = (o & 3) << 1; this.bwSet(i, (this.bw(i) & ~(3 << sh)) | ((v & 3) << sh)); }
+    else { const i = o >> 1; this.bwSet(i, (o & 1) ? ((this.bw(i) & 0x0F) | ((v & 15) << 4)) : ((this.bw(i) & 0xF0) | (v & 15))); }
+  }
+  // ---------- SNES-side bus ----------
+  read(a) {
+    const bank = a >>> 16, off = a & 0xFFFF;
+    if (!(bank & 0x40)) {
+      if (off >= 0x8000) {
+        if (bank === 0 || bank === 0x80) {
+          if ((off === 0xFFEA || off === 0xFFEB) && (this.scnt & 0x10)) return off & 1 ? this.snv >> 8 : this.snv & 0xFF;
+          if ((off === 0xFFEE || off === 0xFFEF) && (this.scnt & 0x40)) return off & 1 ? this.siv >> 8 : this.siv & 0xFF;
+        }
+        return this.romRead(bank, off);
+      }
+      if (off >= 0x6000) { if (this.cc1Active()) return this.cc1Read(((this.bmaps & 0x1F) << 13) + off - 0x6000); return this.bw(((this.bmaps & 0x1F) << 13) + off - 0x6000); }
+      if (off >= 0x3000 && off < 0x3800) return this.iram[off - 0x3000];
+      if (off >= 0x2200 && off < 0x2400) {
+        if (off === 0x2300) return (this.sfrIrq ? 0x80 : 0) | ((this.scnt & 0x40) ? 0x40 : 0) | (this.sfrCh ? 0x20 : 0) | ((this.scnt & 0x10) ? 0x10 : 0) | (this.scnt & 0x0F);
+        if (off === 0x230E) return 0x23;
+        return this.snes.mdr;
+      }
+      return -1;
+    }
+    if (bank >= 0xC0) return this.romRead(bank, off);
+    if ((bank & 0xF0) === 0x40) { const i = ((bank & 0x0F) << 16) | off; return this.cc1Active() ? this.cc1Read(i) : this.bw(i); }
+    return -1;
+  }
+  write(a, v) {
+    const bank = a >>> 16, off = a & 0xFFFF;
+    if (!(bank & 0x40)) {
+      if (off >= 0x8000) return true;
+      if (off >= 0x6000) { this.bwSet(((this.bmaps & 0x1F) << 13) + off - 0x6000, v); return true; }
+      if (off >= 0x3000 && off < 0x3800) { this.iram[off - 0x3000] = v; return true; }
+      if (off >= 0x2200 && off < 0x2400) { this.snesReg(off, v); return true; }
+      return false;
+    }
+    if (bank >= 0xC0) return true;
+    if ((bank & 0xF0) === 0x40) { this.bwSet(((bank & 0x0F) << 16) | off, v); return true; }
+    return false;
+  }
+  snesReg(r, v) {
+    switch (r) {
+      case 0x2200: {
+        const was = this.ccnt; this.ccnt = v;
+        if ((was & 0x20) && !(v & 0x20)) this.sa1Reset();
+        if (v & 0x80) { this.cfrIrq = 1; }
+        if (v & 0x10) { this.cfrNmi = 1; if (this.cie & 0x10) this.cpu.nmiPending = true; }
+        this.updSa1Irq(); break;
+      }
+      case 0x2201: this.sie = v; this.updSnesIrq(); break;
+      case 0x2202: if (v & 0x80) this.sfrIrq = 0; if (v & 0x20) this.sfrCh = 0; this.updSnesIrq(); break;
+      case 0x2203: this.crv = (this.crv & 0xFF00) | v; break;
+      case 0x2204: this.crv = (this.crv & 0xFF) | (v << 8); break;
+      case 0x2205: this.cnv = (this.cnv & 0xFF00) | v; break;
+      case 0x2206: this.cnv = (this.cnv & 0xFF) | (v << 8); break;
+      case 0x2207: this.civ = (this.civ & 0xFF00) | v; break;
+      case 0x2208: this.civ = (this.civ & 0xFF) | (v << 8); break;
+      case 0x2220: case 0x2221: case 0x2222: case 0x2223: this.xb[r - 0x2220] = v; break;
+      case 0x2224: this.bmaps = v; break;
+      case 0x2226: this.sbwe = v; break;
+      default: this.sharedReg(r, v);
+    }
+  }
+  sa1Reset() {
+    const c = this.cpu;
+    c.E = 1; c.P = 0x34; c.S = 0x1FF; c.D = 0; c.DB = 0; c.PB = 0; c.waiting = false; c.stopped = false; c.nmiPending = false;
+    c.PC = this.crv; this.bus.cyc = 0;
+  }
+  updSa1Irq() { this.cpu.irqLine = !!((this.cfrIrq && (this.cie & 0x80)) || (this.cfrTimer && (this.cie & 0x40)) || (this.cfrDma && (this.cie & 0x20))); }
+  updSnesIrq() { this.snes.chipIrq = !!((this.sfrIrq && (this.sie & 0x80)) || (this.sfrCh && (this.sie & 0x20))); }
+  // ---------- SA-1-side bus ----------
+  sRead(a) {
+    this.bus.cyc += 6;
+    const bank = a >>> 16, off = a & 0xFFFF;
+    if (!(bank & 0x40)) {
+      if (off >= 0x8000) {
+        if ((bank === 0 || bank === 0x80) && off >= 0xFFE0) {
+          if (off === 0xFFFC || off === 0xFFFD) return off & 1 ? this.crv >> 8 : this.crv & 0xFF;
+          if (off === 0xFFEA || off === 0xFFEB || off === 0xFFFA || off === 0xFFFB) return off & 1 ? this.cnv >> 8 : this.cnv & 0xFF;
+          if (off === 0xFFEE || off === 0xFFEF || off === 0xFFFE || off === 0xFFFF) return off & 1 ? this.civ >> 8 : this.civ & 0xFF;
+        }
+        return this.romRead(bank, off);
+      }
+      if (off < 0x0800) return this.iram[off];
+      if (off >= 0x3000 && off < 0x3800) return this.iram[off - 0x3000];
+      if (off >= 0x6000) {
+        if (this.bmap & 0x80) return this.bitmapRead(((this.bmap & 0x7F) << 13) + off - 0x6000);
+        return this.bw(((this.bmap & 0x1F) << 13) + off - 0x6000);
+      }
+      if (off >= 0x2200 && off < 0x2400) return this.sa1RegRead(off);
+      return 0;
+    }
+    if (bank >= 0xC0) return this.romRead(bank, off);
+    if ((bank & 0xF0) === 0x40) return this.bw(((bank & 0x0F) << 16) | off);
+    if ((bank & 0xF0) === 0x60) return this.bitmapRead(((bank & 0x0F) << 16) | off);
+    return 0;
+  }
+  sWrite(a, v) {
+    this.bus.cyc += 6;
+    const bank = a >>> 16, off = a & 0xFFFF;
+    if (!(bank & 0x40)) {
+      if (off >= 0x8000) return;
+      if (off < 0x0800) { this.iram[off] = v; return; }
+      if (off >= 0x3000 && off < 0x3800) { this.iram[off - 0x3000] = v; return; }
+      if (off >= 0x6000) {
+        if (this.bmap & 0x80) this.bitmapWrite(((this.bmap & 0x7F) << 13) + off - 0x6000, v);
+        else this.bwSet(((this.bmap & 0x1F) << 13) + off - 0x6000, v);
+        return;
+      }
+      if (off >= 0x2200 && off < 0x2400) this.sa1Reg(off, v);
+      return;
+    }
+    if ((bank & 0xF0) === 0x40) this.bwSet(((bank & 0x0F) << 16) | off, v);
+    else if ((bank & 0xF0) === 0x60) this.bitmapWrite(((bank & 0x0F) << 16) | off, v);
+  }
+  sa1RegRead(r) {
+    switch (r) {
+      case 0x2301: return (this.cfrIrq ? 0x80 : 0) | (this.cfrTimer ? 0x40 : 0) | (this.cfrDma ? 0x20 : 0) | (this.cfrNmi ? 0x10 : 0) | (this.ccnt & 0x0F);
+      case 0x2302: return this.snesH() & 0xFF;
+      case 0x2303: return this.snesH() >> 8;
+      case 0x2304: return this.snes.line & 0xFF;
+      case 0x2305: return this.snes.line >> 8;
+      case 0x2306: return this.mr & 0xFF;
+      case 0x2307: return Math.floor(this.mr / 0x100) & 0xFF;
+      case 0x2308: return Math.floor(this.mr / 0x10000) & 0xFF;
+      case 0x2309: return Math.floor(this.mr / 0x1000000) & 0xFF;
+      case 0x230A: return Math.floor(this.mr / 0x100000000) & 0xFF;
+      case 0x230B: return this.of ? 0x80 : 0;
+      case 0x230C: return this.vdp() & 0xFF;
+      case 0x230D: { const v = this.vdp() >> 8; if (this.vbd & 0x80) this.vadvance(); return v; }
+      case 0x230E: return 0x23;
+    }
+    return 0;
+  }
+  snesH() { return Math.min(340, (this.snes.cyc >> 2)); }
+  sa1Reg(r, v) {
+    switch (r) {
+      case 0x2209: {
+        this.scnt = v;
+        if (v & 0x80) { this.sfrIrq = 1; this.updSnesIrq(); }
+        break;
+      }
+      case 0x220A: this.cie = v; this.updSa1Irq(); break;
+      case 0x220B:
+        if (v & 0x80) this.cfrIrq = 0; if (v & 0x40) this.cfrTimer = 0; if (v & 0x20) this.cfrDma = 0; if (v & 0x10) this.cfrNmi = 0;
+        this.updSa1Irq(); break;
+      case 0x220C: this.snv = (this.snv & 0xFF00) | v; break;
+      case 0x220D: this.snv = (this.snv & 0xFF) | (v << 8); break;
+      case 0x220E: this.siv = (this.siv & 0xFF00) | v; break;
+      case 0x220F: this.siv = (this.siv & 0xFF) | (v << 8); break;
+      case 0x2210: this.tmc = v; break;
+      case 0x2211: this.timerFired = -1; break;
+      case 0x2212: this.hcnt = (this.hcnt & 0x100) | v; break;
+      case 0x2213: this.hcnt = (this.hcnt & 0xFF) | ((v & 1) << 8); break;
+      case 0x2214: this.vcnt = (this.vcnt & 0x100) | v; break;
+      case 0x2215: this.vcnt = (this.vcnt & 0xFF) | ((v & 1) << 8); break;
+      case 0x2225: this.bmap = v; break;
+      case 0x2227: this.cbwe = v; break;
+      case 0x2250: this.mcnt = v; if (v & 2) { this.mr = 0; this.of = 0; } break;
+      case 0x2251: this.ma = (this.ma & 0xFF00) | v; break;
+      case 0x2252: this.ma = (this.ma & 0xFF) | (v << 8); break;
+      case 0x2253: this.mb = (this.mb & 0xFF00) | v; break;
+      case 0x2254: this.mb = (this.mb & 0xFF) | (v << 8); this.math(); break;
+      case 0x2258: {
+        this.vbd = v; this.vb = (v & 15) || 16;
+        if (!(v & 0x80)) this.vadvance();
+        break;
+      }
+      case 0x2259: this.va = (this.va & 0xFFFF00) | v; break;
+      case 0x225A: this.va = (this.va & 0xFF00FF) | (v << 8); break;
+      case 0x225B: this.va = (this.va & 0x00FFFF) | (v << 16); this.vbit = 0; break;
+      default: this.sharedReg(r, v);
+    }
+  }
+  // registers writable by either CPU
+  sharedReg(r, v) {
+    switch (r) {
+      case 0x2230: this.dcnt = v; if (!(v & 0x80)) { } break;
+      case 0x2231:
+        this.cdma = v;
+        if (v & 0x80) { this.dcnt &= 0x7F; this.sfrCh = 0; this.updSnesIrq(); }
+        break;
+      case 0x2232: this.sda = (this.sda & 0xFFFF00) | v; break;
+      case 0x2233: this.sda = (this.sda & 0xFF00FF) | (v << 8); break;
+      case 0x2234: this.sda = (this.sda & 0x00FFFF) | (v << 16); break;
+      case 0x2235: this.dda = (this.dda & 0xFFFF00) | v; break;
+      case 0x2236:
+        this.dda = (this.dda & 0xFF00FF) | (v << 8);
+        if (this.dcnt & 0x80) {
+          if (this.dcnt & 0x20) { if (this.dcnt & 0x10) { this.sfrCh = 1; this.updSnesIrq(); } else { this.cc2line = 0; } }
+          else if (!(this.dcnt & 0x04)) this.normalDma();
+        }
+        break;
+      case 0x2237:
+        this.dda = (this.dda & 0x00FFFF) | (v << 16);
+        if ((this.dcnt & 0x80) && !(this.dcnt & 0x20) && (this.dcnt & 0x04)) this.normalDma();
+        break;
+      case 0x2238: this.dtc = (this.dtc & 0xFF00) | v; break;
+      case 0x2239: this.dtc = (this.dtc & 0xFF) | (v << 8); break;
+      case 0x223F: this.bbf = v; break;
+      default:
+        if (r >= 0x2240 && r <= 0x224F) {
+          this.brf[r - 0x2240] = v;
+          if (r === 0x2247 || r === 0x224F) { if ((this.dcnt & 0xB0) === 0xA0) this.cc2(r === 0x2247 ? 0 : 8); }
+        }
+    }
+  }
+  // ---------- math unit ----------
+  math() {
+    const sa = (this.ma << 16) >> 16, sb = (this.mb << 16) >> 16;
+    if (this.mcnt & 2) {
+      this.mr += sa * sb;
+      if (this.mr >= 2 ** 40 || this.mr < 0) { this.of = 1; this.mr = ((this.mr % 2 ** 40) + 2 ** 40) % 2 ** 40; }
+    } else if (this.mcnt & 1) {
+      const d = this.mb & 0xFFFF;
+      if (!d) this.mr = 0;
+      else { const rem = ((sa % d) + d) % d, q = ((sa - rem) / d) & 0xFFFF; this.mr = rem * 0x10000 + q; }
+      this.ma = 0;
+    } else {
+      let r = sa * sb; if (r < 0) r += 2 ** 32; this.mr = r;
+    }
+    this.mb = 0;
+  }
+  // ---------- variable-length bit reader ----------
+  vdp() {
+    const a = this.va, b0 = this.romRead((a >> 16) & 0xFF, a & 0xFFFF), b1 = this.romRead(((a + 1) >> 16) & 0xFF, (a + 1) & 0xFFFF), b2 = this.romRead(((a + 2) >> 16) & 0xFF, (a + 2) & 0xFFFF);
+    return ((b0 | (b1 << 8) | (b2 << 16)) >> this.vbit) & 0xFFFF;
+  }
+  vadvance() { this.vbit += this.vb; this.va = (this.va + (this.vbit >> 3)) & 0xFFFFFF; this.vbit &= 7; }
+  // ---------- DMA ----------
+  dmaSrcRead(a) {
+    switch (this.dcnt & 3) {
+      case 0: return this.romRead((a >> 16) & 0xFF, a & 0xFFFF);
+      case 1: return this.bw(a & 0xFFFFF);
+      default: return this.iram[a & 0x7FF];
+    }
+  }
+  normalDma() {
+    let n = this.dtc || 0x10000, s = this.sda, d = this.dda;
+    const toBw = this.dcnt & 0x04;
+    while (n-- > 0) {
+      const v = this.dmaSrcRead(s); s = (s + 1) & 0xFFFFFF;
+      if (toBw) this.bwSet(d & 0xFFFFF, v); else this.iram[d & 0x7FF] = v;
+      d = (d + 1) & 0xFFFFFF;
+    }
+    this.bus.cyc += (this.dtc || 0x10000) * 6;
+    this.cfrDma = 1; this.updSa1Irq();
+  }
+  cc1Active() { return (this.dcnt & 0xB0) === 0xB0; }
+  cc1Read(addr) {
+    const cb = this.cdma & 3, size = (this.cdma >> 2) & 7;
+    const charmask = (1 << (6 - cb)) - 1;
+    if ((addr & charmask) === 0) {
+      const bpp = 2 << (2 - cb), bpl = (8 << size) >> cb, bwmask = this.bwram.length;
+      const tile = (((addr - this.sda) % bwmask + bwmask) % bwmask) >> (6 - cb);
+      const ty = tile >> size, tx = tile & ((1 << size) - 1);
+      let bwaddr = this.sda + ty * 8 * bpl + tx * bpp;
+      for (let y = 0; y < 8; y++) {
+        const out = [0, 0, 0, 0, 0, 0, 0, 0];
+        let lo = 0, hi = 0;
+        for (let byte = 0; byte < bpp; byte++) { const b = this.bw(bwaddr + byte); if (byte < 4) lo |= b << (byte * 8); else hi |= b << ((byte - 4) * 8); }
+        lo >>>= 0; hi >>>= 0;
+        bwaddr += bpl;
+        const planes = 8 >> cb;
+        for (let x = 0; x < 8; x++) {
+          for (let p = 0; p < planes; p++) {
+            const bit = x * planes + p;
+            const v = bit < 32 ? (lo >>> bit) & 1 : (hi >>> (bit - 32)) & 1;
+            out[p] |= v << (7 - x);
+          }
+        }
+        for (let byte = 0; byte < bpp; byte++) {
+          const p = this.dda + (y << 1) + ((byte & 6) << 3) + (byte & 1);
+          this.iram[p & 0x7FF] = out[byte];
+        }
+      }
+    }
+    return this.iram[(this.dda + (addr & charmask)) & 0x7FF];
+  }
+  cc2(half) {
+    const cb = this.cdma & 3, bpp = 2 << (2 - cb);
+    let addr = this.dda & 0x7FF;
+    addr &= ~((1 << (7 - cb)) - 1);
+    addr += (this.cc2line & 8) * bpp;
+    addr += (this.cc2line & 7) * 2;
+    for (let byte = 0; byte < bpp; byte++) {
+      let o = 0;
+      for (let bit = 0; bit < 8; bit++) o |= ((this.brf[half + bit] >> byte) & 1) << (7 - bit);
+      this.iram[(addr + ((byte & 6) << 3) + (byte & 1)) & 0x7FF] = o;
+    }
+    this.cc2line = (this.cc2line + 1) & 15;
+  }
+  // ---------- run in lockstep with the main CPU (t in master clocks) ----------
+  sync(target) {
+    if (this.ccnt & 0x60) { this.t = target; return; }   // held in reset or waiting
+    const cpu = this.cpu, bus = this.bus;
+    while (this.t < target) {
+      if (cpu.waiting && !cpu.irqLine && !cpu.nmiPending) { this.t = target; break; }
+      bus.cyc = 0;
+      cpu.step();
+      this.t += bus.cyc / 3;
+      if (this.tmc & 3) this.timer();
+    }
+  }
+  timer() {
+    const line = this.snes.line, h = this.snesH();
+    let hit = false;
+    if ((this.tmc & 3) === 3) hit = line === this.vcnt && h >= this.hcnt;
+    else if (this.tmc & 2) hit = line === this.vcnt;
+    else if (this.tmc & 1) hit = h >= this.hcnt;
+    const key = line * 512 + ((this.tmc & 2) ? 0 : 0);
+    if (hit && this.timerFired !== key) { this.timerFired = key; this.cfrTimer = 1; this.updSa1Irq(); }
+  }
+  rebase(frame) { this.t -= frame; }
+  saveState() {
+    return { s: snapObj(this, ['snes', 'rom', 'bwram', 'sram', 'cpu', 'bus']), xb: this.xb.slice(), cpu: snapObj(this.cpu, ['sys']) };
+  }
+  loadState(st) { restoreObj(this, st.s); this.xb = st.xb.slice(); restoreObj(this.cpu, st.cpu); this.updSa1Irq(); this.updSnesIrq(); }
+}
+// ===== Super FX (GSU-1/2) =====
+const GSU_VEC = [0x00, 0x01, 0x00, 0x01, 0x04, 0x01, 0x00, 0x01, 0x00, 0x01, 0x08, 0x01, 0x00, 0x01, 0x0C, 0x01];
+class GSU {
+  constructor(snes) {
+    this.snes = snes; this.rom = snes.rom;
+    this.ram = new Uint8Array(0x20000);
+    this.battery = snes.cartType === 0x15 || snes.cartType === 0x1A;
+    this.sram = this.battery ? this.ram : new Uint8Array(0);
+    this.cache = new Uint8Array(512); this.valid = new Uint8Array(32);
+    this.r = new Uint16Array(16);
+    this.reset();
+  }
+  reset() {
+    this.r.fill(0); this.pipeline = 0x01; this.r15mod = false;
+    this.z = 0; this.cy = 0; this.s = 0; this.ov = 0; this.g = 0; this.irq = 0; this.alt = 0; this.b = 0; this.sreg = 0; this.dreg = 0;
+    this.pbr = 0; this.rombr = 0; this.rambr = 0; this.cbr = 0; this.scbr = 0; this.scmr = 0; this.colr = 0; this.por = 0;
+    this.bramr = 0; this.cfgr = 0; this.clsr = 0; this.romBuf = 0; this.ramAddr = 0;
+    this.cache.fill(0); this.valid.fill(0);
+    this.t = 0; this.cyc = 0;
+    this.snes.chipIrq = false;
+  }
+  // ---------- GSU bus ----------
+  busRead(a) {
+    const bank = (a >>> 16) & 0xFF;
+    if (bank < 0x40) return this.rom[((((bank & 0x3F) << 15) | (a & 0x7FFF)) >>> 0) % this.rom.length];
+    if (bank < 0x60) return this.rom[(a & 0x1FFFFF) % this.rom.length];
+    return this.ram[a & 0x1FFFF];
+  }
+  ramW(i, v) { i &= 0x1FFFF; if (this.ram[i] !== v) { this.ram[i] = v; if (this.battery) this.snes.sramDirty = true; } }
+  opRead(addr) {
+    const off = (addr - this.cbr) & 0xFFFF;
+    if (off < 512) {
+      if (!this.valid[off >> 4]) {
+        let dp = off & 0x1F0; const sp = (this.pbr << 16) + ((this.cbr + dp) & 0xFFF0);
+        for (let n = 0; n < 16; n++) this.cache[dp++] = this.busRead(sp + n);
+        this.valid[off >> 4] = 1; this.cyc += 12;
+      }
+      this.cyc += 1;
+      return this.cache[off];
+    }
+    this.cyc += 4;
+    return this.busRead((this.pbr << 16) | addr);
+  }
+  pipe() { const v = this.pipeline; this.r[15] = (this.r[15] + 1) & 0xFFFF; this.pipeline = this.opRead(this.r[15]); this.r15mod = false; return v; }
+  setR(n, v) { this.r[n] = v; if (n === 14) this.romBuf = this.busRead((this.rombr << 16) | (v & 0xFFFF)); else if (n === 15) this.r15mod = true; }
+  ramRead(a) { this.cyc += 2; return this.ram[((this.rambr << 16) | a) & 0x1FFFF]; }
+  ramWrite(a, v) { this.cyc += 2; this.ramW((this.rambr << 16) | a, v); }
+  // ---------- SNES side ----------
+  sfrWord() {
+    return (this.z << 1) | (this.cy << 2) | (this.s << 3) | (this.ov << 4) | (this.g << 5) | ((this.alt & 1) << 8) | ((this.alt & 2) << 8) | (this.b << 12) | (this.irq << 15);
+  }
+  read(a) {
+    const bank = a >>> 16, off = a & 0xFFFF;
+    const romBusy = this.g && (this.scmr & 0x10);
+    if (!(bank & 0x40)) {
+      if (off >= 0x8000) {
+        if (romBusy) return (off & 0xFFF0) === 0xFFE0 ? GSU_VEC[off & 15] : this.snes.mdr;
+        return this.rom[((((bank & 0x3F) << 15) | (off & 0x7FFF)) >>> 0) % this.rom.length];
+      }
+      if (off >= 0x6000) return this.ram[off & 0x1FFF];
+      if (off >= 0x3000 && off < 0x3500) return this.regRead(off);
+      return -1;
+    }
+    const b = bank & 0x7F;
+    if (b < 0x60) { if (romBusy) return this.snes.mdr; return this.rom[(((b & 0x1F) << 16) | off) % this.rom.length]; }
+    if (b === 0x70 || b === 0x71) return this.ram[((b & 1) << 16) | off];
+    return -1;
+  }
+  write(a, v) {
+    const bank = a >>> 16, off = a & 0xFFFF;
+    if (!(bank & 0x40)) {
+      if (off >= 0x8000) return true;
+      if (off >= 0x6000) { this.ramW(off & 0x1FFF, v); return true; }
+      if (off >= 0x3000 && off < 0x3500) { this.regWrite(off, v); return true; }
+      return false;
+    }
+    const b = bank & 0x7F;
+    if (b < 0x60) return true;
+    if (b === 0x70 || b === 0x71) { this.ramW(((b & 1) << 16) | off, v); return true; }
+    return false;
+  }
+  regRead(off) {
+    if (off >= 0x3100 && off < 0x3300) return this.cache[(off - 0x3100 + this.cbr) & 511];
+    if (off < 0x3020) { const w = this.r[(off >> 1) & 15]; return off & 1 ? w >> 8 : w & 0xFF; }
+    switch (off) {
+      case 0x3030: return this.sfrWord() & 0xFF;
+      case 0x3031: { const v = this.sfrWord() >> 8; this.irq = 0; this.snes.chipIrq = false; return v; }
+      case 0x3034: return this.pbr;
+      case 0x3036: return this.rombr;
+      case 0x303B: return 0x04;
+      case 0x303C: return this.rambr;
+      case 0x303E: return this.cbr & 0xFF;
+      case 0x303F: return this.cbr >> 8;
+    }
+    return 0;
+  }
+  regWrite(off, v) {
+    if (off >= 0x3100 && off < 0x3300) {
+      const i = (off - 0x3100 + this.cbr) & 511; this.cache[i] = v; if ((i & 15) === 15) this.valid[i >> 4] = 1; return;
+    }
+    if (off < 0x3020) {
+      const n = (off >> 1) & 15;
+      if (off & 1) {
+        this.r[n] = (this.r[n] & 0xFF) | (v << 8);
+        if (n === 14) this.romBuf = this.busRead((this.rombr << 16) | this.r[14]);
+        if (n === 15) this.start();
+      } else this.r[n] = (this.r[n] & 0xFF00) | v;
+      return;
+    }
+    switch (off) {
+      case 0x3030: {
+        this.z = (v >> 1) & 1; this.cy = (v >> 2) & 1; this.s = (v >> 3) & 1; this.ov = (v >> 4) & 1;
+        const wasG = this.g; this.g = (v >> 5) & 1;
+        if (wasG && !this.g) { this.cbr = 0; this.valid.fill(0); }
+        break;
+      }
+      case 0x3031: this.alt = ((v & 1) ? 1 : 0) | ((v & 2) ? 2 : 0); this.b = (v >> 4) & 1; this.irq = (v >> 7) & 1; break;
+      case 0x3033: this.bramr = v & 1; break;
+      case 0x3034: this.pbr = v & 0x7F; this.valid.fill(0); break;
+      case 0x3037: this.cfgr = v; break;
+      case 0x3038: this.scbr = v; break;
+      case 0x3039: this.clsr = v & 1; break;
+      case 0x303A: this.scmr = v; break;
+    }
+  }
+  start() {
+    this.g = 1; this.pipeline = 0x01; this.r15mod = false; this.alt = 0; this.b = 0; this.sreg = 0; this.dreg = 0;
+  }
+  stop() {
+    this.g = 0;
+    this.irq = 1; if (!(this.cfgr & 0x80)) this.snes.chipIrq = true;
+  }
+  // ---------- plotting ----------
+  charAddr(x, y) {
+    const ht = (this.por & 0x10) ? 3 : ((this.scmr & 4) ? 1 : 0) | ((this.scmr & 0x20) ? 2 : 0);
+    let cn;
+    switch (ht) {
+      case 0: cn = ((x & 0xF8) << 1) + ((y & 0xF8) >> 3); break;
+      case 1: cn = ((x & 0xF8) << 1) + ((x & 0xF8) >> 1) + ((y & 0xF8) >> 3); break;
+      case 2: cn = ((x & 0xF8) << 1) + (x & 0xF8) + ((y & 0xF8) >> 3); break;
+      default: cn = ((y & 0x80) << 2) + ((x & 0x80) << 1) + ((y & 0x78) << 1) + ((x & 0x78) >> 3);
+    }
+    const md = this.scmr & 3, bpp = 2 << (md - (md >> 1));
+    return [(cn * (bpp << 3)) + (this.scbr << 10) + ((y & 7) * 2), bpp];
+  }
+  plot(x, y) {
+    x &= 0xFF; y &= 0xFF;
+    let color = this.colr;
+    const md = this.scmr & 3;
+    if ((this.por & 2) && md !== 3) { if ((x ^ y) & 1) color >>= 4; color &= 0x0F; }
+    if (!(this.por & 1)) {
+      if (md === 3) { if ((this.por & 8) ? !(color & 0x0F) : !color) return; }
+      else if (!(color & 0x0F)) return;
+    }
+    const [addr, bpp] = this.charAddr(x, y), bit = 7 - (x & 7);
+    for (let n = 0; n < bpp; n++) {
+      const i = addr + ((n >> 1) << 4) + (n & 1);
+      const old = this.ram[i & 0x1FFFF];
+      this.ramW(i, ((color >> n) & 1) ? (old | (1 << bit)) : (old & ~(1 << bit)));
+    }
+    this.cyc += 1;
+  }
+  rpix(x, y) {
+    x &= 0xFF; y &= 0xFF;
+    const [addr, bpp] = this.charAddr(x, y), bit = 7 - (x & 7);
+    let d = 0;
+    for (let n = 0; n < bpp; n++) d |= ((this.ram[(addr + ((n >> 1) << 4) + (n & 1)) & 0x1FFFF] >> bit) & 1) << n;
+    this.cyc += 4;
+    return d;
+  }
+  color(src) {
+    if (this.por & 4) return (this.colr & 0xF0) | (src >> 4);
+    if (this.por & 8) return (this.colr & 0xF0) | (src & 0x0F);
+    return src & 0xFF;
+  }
+  // ---------- execution ----------
+  sz(v) { this.s = (v >> 15) & 1; this.z = (v & 0xFFFF) ? 0 : 1; }
+  dset(v) { v &= 0xFFFF; this.setR(this.dreg, v); return v; }
+  done() { this.alt = 0; this.b = 0; this.sreg = 0; this.dreg = 0; }
+  step() {
+    const op = this.pipeline;
+    this.pipeline = this.opRead(this.r[15]);
+    this.r15mod = false;
+    this.exec(op);
+    if (!this.r15mod) this.r[15] = (this.r[15] + 1) & 0xFFFF;
+  }
+  exec(op) {
+    const r = this.r, alt = this.alt, n = op & 15;
+    const S = () => r[this.sreg];
+    let v, a, e;
+    if (op >= 0x05 && op <= 0x0F) {
+      e = (this.pipe() << 24) >> 24;
+      let c;
+      switch (op) {
+        case 0x05: c = true; break; case 0x06: c = !(this.s ^ this.ov); break; case 0x07: c = !!(this.s ^ this.ov); break;
+        case 0x08: c = !this.z; break; case 0x09: c = !!this.z; break; case 0x0A: c = !this.s; break; case 0x0B: c = !!this.s; break;
+        case 0x0C: c = !this.cy; break; case 0x0D: c = !!this.cy; break; case 0x0E: c = !this.ov; break; default: c = !!this.ov;
+      }
+      if (c) { r[15] = (r[15] + e) & 0xFFFF; this.r15mod = true; }
+      return;
+    }
+    switch (op >> 4) {
+      case 0x0:
+        switch (op) {
+          case 0x00: this.stop(); this.pipeline = 0x01; this.done(); return;
+          case 0x01: this.done(); return;
+          case 0x02: if (this.cbr !== (r[15] & 0xFFF0)) { this.cbr = r[15] & 0xFFF0; this.valid.fill(0); } this.done(); return;
+          case 0x03: v = S(); this.cy = v & 1; v >>= 1; this.sz(this.dset(v)); this.done(); return;
+          case 0x04: v = S(); a = this.cy; this.cy = v >> 15; v = ((v << 1) | a) & 0xFFFF; this.sz(this.dset(v)); this.done(); return;
+        }
+        return;
+      case 0x1:
+        if (this.b) { v = S(); this.setR(n, v); this.done(); } else { this.dreg = n; }
+        return;
+      case 0x2: this.sreg = this.dreg = n; this.b = 1; return;
+      case 0x3:
+        if (n < 12) {
+          a = r[n]; this.ramAddr = a;
+          if (alt & 1) this.ramWrite(a, S() & 0xFF);
+          else { v = S(); this.ramWrite(a, v & 0xFF); this.ramWrite(a ^ 1, v >> 8); }
+          this.done(); return;
+        }
+        if (n === 12) { v = (r[12] - 1) & 0xFFFF; r[12] = v; this.sz(v); if (v) { r[15] = r[13]; this.r15mod = true; } this.done(); return; }
+        if (n === 13) { this.b = 0; this.alt |= 1; return; }
+        if (n === 14) { this.b = 0; this.alt |= 2; return; }
+        this.b = 0; this.alt = 3; return;
+      case 0x4:
+        if (n < 12) {
+          a = r[n]; this.ramAddr = a;
+          if (alt & 1) v = this.ramRead(a);
+          else v = this.ramRead(a) | (this.ramRead(a ^ 1) << 8);
+          this.dset(v); this.done(); return;
+        }
+        if (n === 12) {
+          if (alt & 1) { v = this.rpix(r[1], r[2]); this.dset(v); this.sz(v); }
+          else { this.plot(r[1], r[2]); r[1] = (r[1] + 1) & 0xFFFF; }
+          this.done(); return;
+        }
+        if (n === 13) { v = S(); v = ((v >> 8) | (v << 8)) & 0xFFFF; this.sz(this.dset(v)); this.done(); return; }
+        if (n === 14) { if (alt & 1) this.por = S() & 0xFF; else this.colr = this.color(S() & 0xFF); this.done(); return; }
+        v = (~S()) & 0xFFFF; this.sz(this.dset(v)); this.done(); return;
+      case 0x5: case 0x6: {
+        const sub = op >= 0x60;
+        const imm = sub ? alt === 2 : !!(alt & 2), b = imm ? n : r[n];
+        a = S();
+        if (!sub) {
+          const c = (alt & 1) ? this.cy : 0;
+          v = a + b + c;
+          this.ov = (~(a ^ b) & (b ^ v) & 0x8000) ? 1 : 0; this.cy = v >= 0x10000 ? 1 : 0;
+          this.sz(this.dset(v));
+        } else {
+          const cmp = alt === 3;
+          const c = (alt === 1) ? (this.cy ? 0 : 1) : 0;
+          v = a - b - c;
+          this.ov = ((a ^ b) & (a ^ v) & 0x8000) ? 1 : 0; this.cy = v >= 0 ? 1 : 0;
+          if (cmp) this.sz(v & 0xFFFF); else this.sz(this.dset(v));
+        }
+        this.done(); return;
+      }
+      case 0x7:
+        if (n === 0) {
+          v = (r[7] & 0xFF00) | (r[8] >> 8);
+          this.s = (v & 0x8080) ? 1 : 0; this.ov = (v & 0xC0C0) ? 1 : 0; this.cy = (v & 0xE0E0) ? 1 : 0; this.z = (v & 0xF0F0) ? 1 : 0;
+          this.dset(v); this.done(); return;
+        }
+        { const b = (alt & 2) ? n : r[n]; v = (alt & 1) ? (S() & ~b) : (S() & b); this.sz(this.dset(v)); this.done(); return; }
+      case 0x8: {
+        const b = (alt & 2) ? n : r[n];
+        if (alt & 1) v = (S() & 0xFF) * (b & 0xFF);
+        else v = (((S() & 0xFF) << 24) >> 24) * (((b & 0xFF) << 24) >> 24);
+        this.sz(this.dset(v)); this.cyc += (this.cfgr & 0x20) ? 0 : 1; this.done(); return;
+      }
+      case 0x9:
+        switch (op) {
+          case 0x90: this.ramWrite(this.ramAddr, S() & 0xFF); this.ramWrite(this.ramAddr ^ 1, S() >> 8); this.done(); return;
+          case 0x91: case 0x92: case 0x93: case 0x94: r[11] = (r[15] + n) & 0xFFFF; this.done(); return;
+          case 0x95: v = ((S() & 0xFF) << 24) >> 24; this.sz(this.dset(v)); this.done(); return;
+          case 0x96: v = S(); this.cy = v & 1; v = (alt & 1) && v === 0xFFFF ? 0 : ((v >> 1) | (v & 0x8000)); this.sz(this.dset(v)); this.done(); return;
+          case 0x97: v = S(); a = this.cy; this.cy = v & 1; v = (v >> 1) | (a << 15); this.sz(this.dset(v)); this.done(); return;
+          case 0x9E: v = S() & 0xFF; this.dset(v); this.s = (v >> 7) & 1; this.z = v ? 0 : 1; this.done(); return;
+          case 0x9F: {
+            const p = ((S() << 16) >> 16) * ((r[6] << 16) >> 16);
+            if (alt & 1) r[4] = p & 0xFFFF;
+            v = (p >> 16) & 0xFFFF; this.dset(v); this.cy = (p >> 15) & 1; this.sz(v);
+            this.cyc += (this.cfgr & 0x20) ? 3 : 7; this.done(); return;
+          }
+          default:   // 98-9D JMP / LJMP
+            if (alt & 1) { this.pbr = r[n] & 0x7F; r[15] = S(); this.r15mod = true; this.cbr = r[15] & 0xFFF0; this.valid.fill(0); }
+            else { r[15] = r[n]; this.r15mod = true; }
+            this.done(); return;
+        }
+      case 0xA:
+        if (alt === 0 || alt === 3) { v = ((this.pipe() << 24) >> 24) & 0xFFFF; this.setR(n, v); }
+        else if (alt & 1 && !(alt & 2)) { a = this.pipe() << 1; this.ramAddr = a; v = this.ramRead(a) | (this.ramRead(a ^ 1) << 8); this.setR(n, v); }
+        else { a = this.pipe() << 1; this.ramAddr = a; this.ramWrite(a, r[n] & 0xFF); this.ramWrite(a ^ 1, r[n] >> 8); }
+        this.done(); return;
+      case 0xB:
+        if (this.b) { v = r[n]; this.setR(this.dreg, v); this.ov = (v & 0x80) ? 1 : 0; this.sz(v); this.done(); }
+        else this.sreg = n;
+        return;
+      case 0xC:
+        if (n === 0) { v = S() >> 8; this.dset(v); this.s = (v >> 7) & 1; this.z = v ? 0 : 1; this.done(); return; }
+        { const b = (alt & 2) ? n : r[n]; v = (alt & 1) ? (S() ^ b) : (S() | b); this.sz(this.dset(v)); this.done(); return; }
+      case 0xD:
+        if (n < 15) { v = (r[n] + 1) & 0xFFFF; this.setR(n, v); this.sz(v); this.done(); return; }
+        if (alt === 0 || alt === 1) this.colr = this.color(this.romBuf);
+        else if (alt === 2) this.rambr = S() & 1;
+        else this.rombr = S() & 0x7F;
+        this.done(); return;
+      case 0xE:
+        if (n < 15) { v = (r[n] - 1) & 0xFFFF; this.setR(n, v); this.sz(v); this.done(); return; }
+        if (alt === 0) v = this.romBuf;
+        else if (alt === 1) v = (S() & 0xFF) | (this.romBuf << 8);
+        else if (alt === 2) v = (S() & 0xFF00) | this.romBuf;
+        else v = ((this.romBuf << 24) >> 24) & 0xFFFF;
+        this.dset(v); this.cyc += 2; this.done(); return;
+      case 0xF:
+        if (alt === 0 || alt === 3) { a = this.pipe(); a |= this.pipe() << 8; this.setR(n, a); }
+        else if (alt === 1) { a = this.pipe(); a |= this.pipe() << 8; this.ramAddr = a; v = this.ramRead(a) | (this.ramRead(a ^ 1) << 8); this.setR(n, v); }
+        else { a = this.pipe(); a |= this.pipe() << 8; this.ramAddr = a; this.ramWrite(a, r[n] & 0xFF); this.ramWrite(a ^ 1, r[n] >> 8); }
+        this.done(); return;
+    }
+  }
+  sync(target) {
+    if (!this.g) { this.t = target; return; }
+    const mul = this.clsr ? 1 : 2;
+    let guard = 0;
+    while (this.g && this.t < target && guard++ < 400000) {
+      this.cyc = 0;
+      this.step();
+      this.t += Math.max(1, this.cyc) * mul;
+    }
+    if (!this.g) this.t = target;
+  }
+  rebase(frame) { this.t -= frame; }
+  saveState() { return { s: snapObj(this, ['snes', 'rom', 'sram']) }; }
+  loadState(st) { restoreObj(this, st.s); this.snes.chipIrq = !!(this.irq && !(this.cfgr & 0x80)); }
+}
+// Capcom Cx4 (Mega Man X2 / X3) — high-level emulation of the chip's command set.
+// The chip sits at $6000-$7FFF in banks 00-3F/80-BF: 3KB work RAM plus registers at $7F40-$7F5F.
+const CX4_SIN = new Int16Array(512), CX4_COS = new Int16Array(512);
+for (let i = 0; i < 512; i++) { CX4_SIN[i] = Math.trunc(32767 * Math.sin(i * Math.PI * 2 / 512)); }
+for (let i = 0; i < 512; i++) CX4_COS[i] = CX4_SIN[(i + 128) & 511];
+const CX4_TEST = [0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
+  0xff, 0xff, 0x00, 0x00, 0x80, 0xff, 0xff, 0x7f, 0x00, 0x80, 0x00, 0xff, 0x7f, 0x00, 0xff, 0x7f,
+  0xff, 0x7f, 0xff, 0xff, 0x00, 0x00, 0x01, 0xff, 0xff, 0xfe, 0x00, 0x01, 0x00, 0xff, 0xfe, 0x00];
+const CX4_WAVE = [];
+for (let r = 0; r < 5; r++) for (let c = 0; c < 8; c++) CX4_WAVE.push(r * 0x200 + c * 2);
+const s16 = v => (v << 16) >> 16, s8 = v => (v << 24) >> 24, s24 = v => (v << 8) >> 8;
+
+class Cx4 {
+  constructor(snes) { this.snes = snes; this.ram = new Uint8Array(0x2000); this.reset(); }
+  reset() { this.ram.fill(0); this.wf = { x: 0, y: 0, z: 0, x2: 0, y2: 0, dist: 0, scale: 0 }; }
+  romByte(a) { const r = this.snes.rom; return r[((((a >>> 16) & 0x7F) << 15) | (a & 0x7FFF)) % r.length]; }
+  w16(o) { return this.ram[o & 0x1FFF] | (this.ram[(o + 1) & 0x1FFF] << 8); }
+  w24(o) { return this.w16(o) | (this.ram[(o + 2) & 0x1FFF] << 16); }
+  s16(o, v) { this.ram[o & 0x1FFF] = v; this.ram[(o + 1) & 0x1FFF] = v >> 8; }
+  s24(o, v) { this.s16(o, v); this.ram[(o + 2) & 0x1FFF] = v >> 16; }
+  read(a) {
+    const bank = (a >>> 16) & 0x7F, off = a & 0xFFFF;
+    if (bank >= 0x40 || off < 0x6000 || off >= 0x8000) return -1;
+    if (off === 0x7F5E) return 0;               // status: never busy
+    return this.ram[off - 0x6000];
+  }
+  write(a, v) {
+    const bank = (a >>> 16) & 0x7F, off = a & 0xFFFF;
+    if (bank >= 0x40 || off < 0x6000 || off >= 0x8000) return false;
+    this.ram[off - 0x6000] = v;
+    if (off === 0x7F4F) this.command(v);
+    else if (off === 0x7F47) {                   // ROM -> RAM transfer
+      const src = this.w24(0x1F40), len = this.w16(0x1F43), dst = this.w16(0x1F45) & 0x1FFF;
+      const tmp = new Uint8Array(len);
+      for (let i = 0; i < len; i++) tmp[i] = this.romByte(src + i);
+      for (let i = 0; i < len; i++) this.ram[(dst + i) & 0x1FFF] = tmp[i];
+    }
+    return true;
+  }
+  command(op) {
+    const R = this.ram;
+    if (R[0x1F4D] === 0x0E && op < 0x40 && (op & 3) === 0) { R[0x1F80] = op >> 2; return; }
+    switch (op) {
+      case 0x00:
+        switch (R[0x1F4D]) {
+          case 0x00: this.convOAM(); break;
+          case 0x03: this.scaleRotate(0); break;
+          case 0x05: this.transformLines(); break;
+          case 0x07: this.scaleRotate(64); break;
+          case 0x08: this.drawWireFrame(); break;
+          case 0x0B: this.disintegrate(); break;
+          case 0x0C: this.bitplaneWave(); break;
+        }
+        break;
+      case 0x01: R.fill(0, 0x300, 0x300 + 16 * 12 * 3 * 4); this.drawWireFrame(); break;
+      case 0x05: {                                 // propulsion
+        let t = 0x10000; const d = this.w16(0x1F83);
+        if (d) t = (Math.trunc(t / d) * this.w16(0x1F81)) >> 8;
+        this.s16(0x1F80, t); break;
+      }
+      case 0x0D: {                                 // set vector length
+        let x = s16(this.w16(0x1F80)), y = s16(this.w16(0x1F83)); const dist = s16(this.w16(0x1F86));
+        const t = dist / Math.sqrt(y * y + x * x);
+        y = s16(Math.trunc(y * t * 0.99)); x = s16(Math.trunc(x * t * 0.98));
+        this.s16(0x1F89, x); this.s16(0x1F8C, y); break;
+      }
+      case 0x10: case 0x13: {                      // polar -> rectangular
+        const r1 = s16(this.w16(0x1F83)), ang = this.w16(0x1F80) & 0x1FF, sh = op === 0x10 ? 16 : 8;
+        let t = Math.floor(r1 * CX4_COS[ang] * 2 / (1 << sh));
+        this.s24(0x1F86, t);
+        t = Math.floor(r1 * CX4_SIN[ang] * 2 / (1 << sh));
+        this.s24(0x1F89, op === 0x10 ? t - (t >> 6) : t); break;
+      }
+      case 0x15: {                                 // pythagorean
+        const x = s16(this.w16(0x1F80)), y = s16(this.w16(0x1F83));
+        this.s16(0x1F80, s16(Math.trunc(Math.sqrt(x * x + y * y)))); break;
+      }
+      case 0x1F: {                                 // atan
+        const x = s16(this.w16(0x1F80)), y = s16(this.w16(0x1F83)); let a;
+        if (x === 0) a = y > 0 ? 0x80 : 0x180;
+        else { a = s16(Math.trunc(Math.atan(y / x) / (Math.PI * 2) * 512)); if (x < 0) a += 0x100; a &= 0x1FF; }
+        this.s16(0x1F86, a); break;
+      }
+      case 0x22: {                                 // trapezoid
+        const a1 = this.w16(0x1F8C) & 0x1FF, a2 = this.w16(0x1F8F) & 0x1FF;
+        const tan1 = CX4_COS[a1] !== 0 ? ((CX4_SIN[a1] * 65536) / CX4_COS[a1]) | 0 : -0x80000000;
+        const tan2 = CX4_COS[a2] !== 0 ? ((CX4_SIN[a2] * 65536) / CX4_COS[a2]) | 0 : -0x80000000;
+        let y = s16(this.w16(0x1F83) - this.w16(0x1F89));
+        const base = this.w16(0x1F86) - this.w16(0x1F80), wide = this.w16(0x1F93);
+        for (let j = 0; j < 225; j++) {
+          let l, r;
+          if (y >= 0) {
+            l = s16(Math.floor(tan1 * y / 65536) + base); r = s16(Math.floor(tan2 * y / 65536) + base + wide);
+            if (l < 0 && r < 0) { l = 1; r = 0; } else if (l < 0) l = 0; else if (r < 0) r = 0;
+            if (l > 255 && r > 255) { l = 255; r = 254; } else if (l > 255) l = 255; else if (r > 255) r = 255;
+          } else { l = 1; r = 0; }
+          R[0x800 + j] = l; R[0x900 + j] = r; y = s16(y + 1);
+        }
+        break;
+      }
+      case 0x25: {                                 // multiply (24-bit)
+        const a = s24(this.w24(0x1F80)), b = s24(this.w24(0x1F83));
+        this.s24(0x1F80, Number(BigInt.asIntN(32, BigInt(a) * BigInt(b))) & 0xFFFFFF); break;
+      }
+      case 0x2D: {                                 // transform coordinates
+        const w = this.wf;
+        w.x = s16(this.w16(0x1F81)); w.y = s16(this.w16(0x1F84)); w.z = s16(this.w16(0x1F87));
+        w.x2 = R[0x1F89]; w.y2 = R[0x1F8A]; w.dist = R[0x1F8B]; w.scale = this.w16(0x1F90);
+        this.transf(false); this.s16(0x1F80, w.x); this.s16(0x1F83, w.y); break;
+      }
+      case 0x40: { let sum = 0; for (let i = 0; i < 0x800; i++) sum += R[i]; this.s16(0x1F80, sum); break; }
+      case 0x54: {                                 // square
+        const a = BigInt(s24(this.w24(0x1F80))), sq = a * a;
+        this.s24(0x1F83, Number(sq & 0xFFFFFFn)); this.s24(0x1F86, Number((sq >> 24n) & 0xFFFFFFn)); break;
+      }
+      case 0x5C: for (let i = 0; i < 48; i++) R[i] = CX4_TEST[i]; break;
+      case 0x89: R[0x1F80] = 0x36; R[0x1F81] = 0x43; R[0x1F82] = 0x05; break;
+    }
+  }
+  // ---- 3D helpers ----
+  transf(perspective) {
+    const w = this.wf;
+    let x = w.x, y = w.y, z = w.z - 0x95, t;
+    t = -w.x2 * Math.PI * 2 / 128;
+    const y2 = y * Math.cos(t) - z * Math.sin(t), z2 = y * Math.sin(t) + z * Math.cos(t);
+    t = -w.y2 * Math.PI * 2 / 128;
+    const x2 = x * Math.cos(t) + z2 * Math.sin(t); z = x * -Math.sin(t) + z2 * Math.cos(t);
+    t = -w.dist * Math.PI * 2 / 128;
+    x = x2 * Math.cos(t) - y2 * Math.sin(t); y = x2 * Math.sin(t) + y2 * Math.cos(t);
+    if (perspective) { const k = w.scale / (0x90 * (z + 0x95)) * 0x95; w.x = s16(Math.trunc(x * k)); w.y = s16(Math.trunc(y * k)); }
+    else { w.x = s16(Math.trunc(x * w.scale / 0x100)); w.y = s16(Math.trunc(y * w.scale / 0x100)); }
+  }
+  calcWire() {
+    const w = this.wf;
+    w.x = s16(w.x2 - w.x); w.y = s16(w.y2 - w.y);
+    if (Math.abs(w.x) > Math.abs(w.y)) {
+      w.dist = Math.abs(w.x) + 1; w.y = s16(Math.trunc(256 * w.y / Math.abs(w.x))); w.x = w.x < 0 ? -256 : 256;
+    } else if (w.y !== 0) {
+      w.dist = Math.abs(w.y) + 1; w.x = s16(Math.trunc(256 * w.x / Math.abs(w.y))); w.y = w.y < 0 ? -256 : 256;
+    } else w.dist = 0;
+  }
+  transformLines() {
+    const R = this.ram, w = this.wf;
+    w.x2 = R[0x1F83]; w.y2 = R[0x1F86]; w.dist = R[0x1F89]; w.scale = R[0x1F8C];
+    const rx = w.x2, ry = w.y2, rd = w.dist;
+    for (let i = this.w16(0x1F80), p = 0; i > 0; i--, p += 0x10) {
+      w.x = s16(this.w16(p + 1)); w.y = s16(this.w16(p + 5)); w.z = s16(this.w16(p + 9));
+      w.x2 = rx; w.y2 = ry; w.dist = rd;
+      this.transf(true);
+      this.s16(p + 1, w.x + 0x80); this.s16(p + 5, w.y + 0x50);
+    }
+    this.s16(0x600, 23); this.s16(0x602, 0x60); this.s16(0x605, 0x40);
+    this.s16(0x608, 23); this.s16(0x60A, 0x60); this.s16(0x60D, 0x40);
+    for (let i = this.w16(0xB00), p = 0xB02, p2 = 0; i > 0; i--, p += 2, p2 += 8) {
+      const a = R[p & 0x1FFF] << 4, b = R[(p + 1) & 0x1FFF] << 4;
+      w.x = s16(this.w16(a + 1)); w.y = s16(this.w16(a + 5)); w.x2 = s16(this.w16(b + 1)); w.y2 = s16(this.w16(b + 5));
+      this.calcWire();
+      this.s16(p2 + 0x600, w.dist ? w.dist : 1); this.s16(p2 + 0x602, w.x); this.s16(p2 + 0x605, w.y);
+    }
+  }
+  drawWireFrame() {
+    const R = this.ram, bank = R[0x1F82] << 16;
+    let line = this.w24(0x1F80);
+    const rb = a => this.romByte(a);
+    for (let i = R[0x295]; i > 0; i--, line += 5) {
+      let p1;
+      if (rb(line) === 0xFF && rb(line + 1) === 0xFF) {
+        let t = line - 5;
+        while (rb(t + 2) === 0xFF && rb(t + 3) === 0xFF) t -= 5;
+        p1 = bank | (rb(t + 2) << 8) | rb(t + 3);
+      } else p1 = bank | (rb(line) << 8) | rb(line + 1);
+      const p2 = bank | (rb(line + 2) << 8) | rb(line + 3);
+      const g = (p, o) => s16((rb(p + o) << 8) | rb(p + o + 1));
+      this.drawLine(g(p1, 0), g(p1, 2), g(p1, 4), g(p2, 0), g(p2, 2), g(p2, 4), rb(line + 4));
+    }
+  }
+  drawLine(X1, Y1, Z1, X2, Y2, Z2, color) {
+    const R = this.ram, w = this.wf;
+    w.x = X1; w.y = Y1; w.z = Z1; w.scale = R[0x1F90]; w.x2 = R[0x1F86]; w.y2 = R[0x1F87]; w.dist = R[0x1F88];
+    this.transf(false); X1 = (w.x + 48) << 8; Y1 = (w.y + 48) << 8;
+    w.x = X2; w.y = Y2; w.z = Z2; w.x2 = R[0x1F86]; w.y2 = R[0x1F87]; w.dist = R[0x1F88];
+    this.transf(false); X2 = (w.x + 48) << 8; Y2 = (w.y + 48) << 8;
+    w.x = s16(X1 >> 8); w.y = s16(Y1 >> 8); w.x2 = s16(X2 >> 8); w.y2 = s16(Y2 >> 8);
+    this.calcWire();
+    X2 = w.x; Y2 = w.y;
+    for (let i = w.dist ? w.dist : 1; i > 0; i--) {
+      if (X1 > 0xFF && Y1 > 0xFF && X1 < 0x6000 && Y1 < 0x6000) {
+        const yy = Y1 >> 8, xx = X1 >> 8;
+        const addr = (((yy >> 3) << 8) - ((yy >> 3) << 6) + ((xx >> 3) << 4) + (yy & 7) * 2) & 0xFFFF;
+        const bit = 0x80 >> (xx & 7), o = (addr + 0x300) & 0x1FFF, o2 = (addr + 0x301) & 0x1FFF;
+        R[o] &= ~bit; R[o2] &= ~bit;
+        if (color & 1) R[o] |= bit;
+        if (color & 2) R[o2] |= bit;
+      }
+      X1 += X2; Y1 += Y2;
+    }
+  }
+  // ---- sprite operations ----
+  convOAM() {
+    const R = this.ram;
+    let oam = R[0x626] << 2;
+    for (let i = 0x1FD; i > oam; i -= 4) R[i] = 0xE0;
+    const gx = this.w16(0x621), gy = this.w16(0x623);
+    let oam2 = 0x200 + (R[0x626] >> 2);
+    if (R[0x620] === 0) return;
+    let count = 128 - R[0x626], offset = (R[0x626] & 3) * 2, src = 0x220;
+    for (let i = R[0x620]; i > 0 && count > 0; i--, src += 16) {
+      const sx = s16(this.w16(src) - gx), sy = s16(this.w16(src + 2) - gy);
+      const name = R[src + 5], attr = R[src + 4] | R[src + 6];
+      let sp = this.w24(src + 7);
+      const n = this.romByte(sp);
+      if (n !== 0) {
+        sp++;
+        for (let c = n; c > 0 && count > 0; c--, sp += 4) {
+          const b0 = this.romByte(sp), big = b0 & 0x20;
+          let X = s8(this.romByte(sp + 1));
+          if (attr & 0x40) X = -X - (big ? 16 : 8);
+          X = s16(X + sx);
+          if (X >= -16 && X <= 272) {
+            let Y = s8(this.romByte(sp + 2));
+            if (attr & 0x80) Y = -Y - (big ? 16 : 8);
+            Y = s16(Y + sy);
+            if (Y >= -16 && Y <= 224) {
+              R[oam] = X & 0xFF; R[oam + 1] = Y & 0xFF; R[oam + 2] = (name + this.romByte(sp + 3)) & 0xFF; R[oam + 3] = attr ^ (b0 & 0xC0);
+              R[oam2] &= ~(3 << offset);
+              if (X & 0x100) R[oam2] |= 1 << offset;
+              if (big) R[oam2] |= 2 << offset;
+              oam += 4; count--; offset = (offset + 2) & 6; if (offset === 0) oam2++;
+            }
+          }
+        }
+      } else if (count > 0) {
+        R[oam] = sx & 0xFF; R[oam + 1] = sy & 0xFF; R[oam + 2] = name; R[oam + 3] = attr;
+        R[oam2] &= ~(3 << offset);
+        R[oam2] |= ((sx & 0x100) ? 3 : 2) << offset;
+        oam += 4; count--; offset = (offset + 2) & 6; if (offset === 0) oam2++;
+      }
+    }
+  }
+  scaleRotate(pad) {
+    const R = this.ram;
+    let xs = this.w16(0x1F8F); if (xs & 0x8000) xs = 0x7FFF;
+    let ys = this.w16(0x1F92); if (ys & 0x8000) ys = 0x7FFF;
+    const ang = this.w16(0x1F80); let A, B, C, D;
+    if (ang === 0) { A = xs; B = 0; C = 0; D = ys; }
+    else if (ang === 128) { A = 0; B = s16(-ys); C = xs; D = 0; }
+    else if (ang === 256) { A = s16(-xs); B = 0; C = 0; D = s16(-ys); }
+    else if (ang === 384) { A = 0; B = ys; C = s16(-xs); D = 0; }
+    else {
+      const a = ang & 0x1FF;
+      A = s16((CX4_COS[a] * xs) >> 15); B = s16(-((CX4_SIN[a] * ys) >> 15));
+      C = s16((CX4_SIN[a] * xs) >> 15); D = s16((CX4_COS[a] * ys) >> 15);
+    }
+    const w = R[0x1F89] & ~7, h = R[0x1F8C] & ~7;
+    R.fill(0, 0, Math.min(0x2000, ((w + pad / 4) * h / 2) | 0));
+    const cx = s16(this.w16(0x1F83)), cy = s16(this.w16(0x1F86));
+    let lx = (cx << 12) - cx * A - cx * B, ly = (cy << 12) - cy * C - cy * D;
+    let out = 0, bit = 0x80;
+    for (let y = 0; y < h; y++) {
+      let X = lx | 0, Y = ly | 0;
+      for (let x = 0; x < w; x++) {
+        let px = 0;
+        const xi = X >>> 12, yi = Y >>> 12;
+        if (xi < w && yi < h) { const addr = yi * w + xi; px = R[(0x600 + (addr >> 1)) & 0x1FFF]; if (addr & 1) px >>= 4; }
+        if (px & 1) R[out & 0x1FFF] |= bit;
+        if (px & 2) R[(out + 1) & 0x1FFF] |= bit;
+        if (px & 4) R[(out + 16) & 0x1FFF] |= bit;
+        if (px & 8) R[(out + 17) & 0x1FFF] |= bit;
+        bit >>= 1; if (!bit) { bit = 0x80; out += 32; }
+        X = (X + A) | 0; Y = (Y + C) | 0;
+      }
+      out += 2 + pad;
+      if (out & 0x10) out &= ~0x10; else out -= w * 4 + pad;
+      lx += B; ly += D;
+    }
+  }
+  disintegrate() {
+    const R = this.ram;
+    const w = R[0x1F89], h = R[0x1F8C];
+    const cx = s16(this.w16(0x1F80)), cy = s16(this.w16(0x1F83));
+    const sx = s16(this.w16(0x1F86)), sy = s16(this.w16(0x1F8F));
+    const startX = (-cx * sx + (cx << 8)) >>> 0, startY = (-cy * sy + (cy << 8)) >>> 0;
+    let src = 0x600;
+    R.fill(0, 0, Math.min(0x2000, (w * h / 2) | 0));
+    for (let i = 0, y = startY; i < h; i++, y = (y + sy) >>> 0) {
+      for (let j = 0, x = startX; j < w; j++, x = (x + sx) >>> 0) {
+        if ((x >>> 8) < w && (y >>> 8) < h && (y >>> 8) * w + (x >>> 8) < 0x2000) {
+          const px = (j & 1) ? (R[src & 0x1FFF] >> 4) : R[src & 0x1FFF];
+          const idx = ((y >>> 11) * w * 4 + (x >>> 11) * 32 + ((y >>> 8) & 7) * 2) & 0x1FFF;
+          const m = 0x80 >> ((x >>> 8) & 7);
+          if (px & 1) R[idx] |= m;
+          if (px & 2) R[(idx + 1) & 0x1FFF] |= m;
+          if (px & 4) R[(idx + 16) & 0x1FFF] |= m;
+          if (px & 8) R[(idx + 17) & 0x1FFF] |= m;
+        }
+        if (j & 1) src++;
+      }
+    }
+  }
+  bitplaneWave() {
+    const R = this.ram;
+    let dst = 0, wave = R[0x1F83], m1 = 0xC0C0, m2 = 0x3F3F;
+    const pass = () => {
+      do {
+        let height = -s8(R[(wave + 0xB00) & 0x1FFF]) - 16;
+        for (let i = 0; i < 40; i++) {
+          const o = dst + CX4_WAVE[i];
+          let t = this.w16(o) & m2;
+          if (height >= 0) t |= m1 & (height < 8 ? this.w16(0xA00 + height * 2) : 0xFF00);
+          this.s16(o, t); height++;
+        }
+        wave = (wave + 1) & 0x7F;
+        m1 = ((m1 >> 2) | (m1 << 6)) & 0xFFFF; m2 = ((m2 >> 2) | (m2 << 6)) & 0xFFFF;
+      } while (m1 !== 0xC0C0);
+      dst += 16;
+    };
+    for (let j = 0; j < 0x10; j++) { pass(); pass(); }
+  }
+  saveState() { return { ram: this.ram.slice(), wf: Object.assign({}, this.wf) }; }
+  loadState(s) { this.ram.set(s.ram); this.wf = Object.assign({}, s.wf); }
+}
+// S-DD1 (Star Ocean / Street Fighter Alpha 2): ROM bank controller + real-time graphics decompression on DMA.
+// The decompressor follows the publicly documented algorithm (Golomb run codes + adaptive context model).
+const SDD1_EVO = [
+  [0, 25, 25], [0, 2, 1], [0, 3, 1], [0, 4, 2], [0, 5, 3], [1, 6, 4], [1, 7, 5], [1, 8, 6], [1, 9, 7], [2, 10, 8],
+  [2, 11, 9], [2, 12, 10], [2, 13, 11], [3, 14, 12], [3, 15, 13], [3, 16, 14], [3, 17, 15], [4, 18, 16], [4, 19, 17], [5, 20, 18],
+  [5, 21, 19], [6, 22, 20], [6, 23, 21], [7, 24, 22], [7, 24, 23], [0, 26, 1], [1, 27, 2], [2, 28, 4], [3, 29, 8], [4, 30, 12],
+  [5, 31, 16], [6, 32, 18], [7, 24, 22]];
+const SDD1_RUN = new Uint8Array(256);
+for (let i = 1; i < 256; i++) {
+  const k = 31 - Math.clz32(i), inv = ~i & ((1 << k) - 1);
+  let r = 0; for (let b = 0; b < k; b++) if (inv & (1 << b)) r |= 1 << (k - 1 - b);
+  SDD1_RUN[i] = r;
+}
+
+class SDD1Decomp {
+  constructor(rd) { this.rd = rd; }
+  init(addr) {
+    const h = this.rd(addr);
+    this.off = addr; this.bitc = 4;                                   // input manager
+    this.mps = new Uint16Array(8); this.lps = new Uint8Array(8);      // bit generators
+    this.status = new Uint8Array(32); this.cmps = new Uint8Array(32); // probability estimation
+    this.planes = h & 0xC0; this.ctxInfo = h & 0x30; this.bitn = 0;   // context model
+    this.prev = new Uint16Array(8);
+    this.plane = this.planes === 0x00 ? 1 : this.planes === 0x40 ? 7 : this.planes === 0x80 ? 3 : 0;
+    this.r0 = 1; this.r1 = 0; this.r2 = 0;                            // output logic
+  }
+  codeword(len) {
+    let cw = (this.rd(this.off) << this.bitc) & 0xFF;
+    this.bitc++;
+    if (cw & 0x80) { cw |= this.rd(this.off + 1) >> (9 - this.bitc); this.bitc += len; }
+    if (this.bitc & 8) { this.off++; this.bitc &= 7; }
+    return cw & 0xFF;
+  }
+  bgBit(n) {
+    if (!(this.mps[n] || this.lps[n])) {
+      const cw = this.codeword(n);
+      if (cw & 0x80) { this.lps[n] = 1; this.mps[n] = SDD1_RUN[cw >> (n ^ 7)]; }
+      else this.mps[n] = 1 << n;
+    }
+    let bit;
+    if (this.mps[n]) { bit = 0; this.mps[n]--; } else { bit = 1; this.lps[n] = 0; }
+    this.eor = !(this.mps[n] || this.lps[n]);
+    return bit;
+  }
+  pemBit(ctx) {
+    const st = this.status[ctx], m = this.cmps[ctx], e = SDD1_EVO[st];
+    const bit = this.bgBit(e[0]);
+    if (this.eor) {
+      if (bit) { if (!(st & 0xFE)) this.cmps[ctx] ^= 1; this.status[ctx] = e[2]; }
+      else this.status[ctx] = e[1];
+    }
+    return bit ^ m;
+  }
+  cmBit() {
+    switch (this.planes) {
+      case 0x00: this.plane ^= 1; break;
+      case 0x40: this.plane ^= 1; if (!(this.bitn & 0x7F)) this.plane = (this.plane + 2) & 7; break;
+      case 0x80: this.plane ^= 1; if (!(this.bitn & 0x7F)) this.plane ^= 2; break;
+      default: this.plane = this.bitn & 7;
+    }
+    const cb = this.prev[this.plane];
+    let ctx = (this.plane & 1) << 4;
+    switch (this.ctxInfo) {
+      case 0x00: ctx |= ((cb & 0x1C0) >> 5) | (cb & 1); break;
+      case 0x10: ctx |= ((cb & 0x180) >> 5) | (cb & 1); break;
+      case 0x20: ctx |= ((cb & 0x0C0) >> 5) | (cb & 1); break;
+      default: ctx |= ((cb & 0x180) >> 5) | (cb & 3);
+    }
+    const bit = this.pemBit(ctx);
+    this.prev[this.plane] = (cb << 1) | bit;
+    this.bitn = (this.bitn + 1) & 0xFF;
+    return bit;
+  }
+  read() {
+    if (this.planes !== 0xC0) {
+      if (this.r0 === 0) { this.r0 = 0xFF; return this.r2; }
+      this.r1 = 0; this.r2 = 0;
+      for (let m = 0x80; m; m >>= 1) { if (this.cmBit()) this.r1 |= m; if (this.cmBit()) this.r2 |= m; }
+      this.r0 = 0;
+      return this.r1;
+    }
+    let v = 0;
+    for (let m = 1; m < 0x100; m <<= 1) if (this.cmBit()) v |= m;
+    return v;
+  }
+  saveState() {
+    const o = {}; for (const k of ['off', 'bitc', 'planes', 'ctxInfo', 'bitn', 'plane', 'r0', 'r1', 'r2', 'eor']) o[k] = this[k];
+    for (const k of ['mps', 'lps', 'status', 'cmps', 'prev']) o[k] = this[k] ? Array.from(this[k]) : null;
+    return o;
+  }
+  loadState(o) {
+    Object.assign(this, o);
+    this.mps = new Uint16Array(o.mps || 8); this.lps = new Uint8Array(o.lps || 8);
+    this.status = new Uint8Array(o.status || 32); this.cmps = new Uint8Array(o.cmps || 32); this.prev = new Uint16Array(o.prev || 8);
+  }
+}
+
+class SDD1 {
+  constructor(snes) {
+    this.snes = snes;
+    this.dec = new SDD1Decomp(a => this.romByte(a));
+    this.reset();
+  }
+  reset() {
+    this.r4800 = 0; this.r4801 = 0; this.mmc = [0, 1, 2, 3];
+    this.size = new Array(8).fill(0); this.cur = -1; this.left = 0;
+  }
+  romByte(a) {
+    const r = this.snes.rom, bank = (a >>> 16) & 0xFF;
+    let i;
+    if (!(bank & 0x40)) {
+      if ((bank & 0x20) && (this.mmc[bank & 0x80 ? 3 : 1] & 0x80)) a &= ~0x200000;
+      i = ((a >>> 1) & 0x1F8000) | (a & 0x7FFF);
+    } else i = ((this.mmc[(a >>> 20) & 3] & 0xF) << 20) | (a & 0xFFFFF);
+    return r[i % r.length];
+  }
+  read(a) {
+    const bank = (a >>> 16) & 0xFF, off = a & 0xFFFF, b = bank & 0x7F;
+    if (b < 0x40) {
+      if (off >= 0x8000) return this.romByte(a);
+      if (off >= 0x4800 && off <= 0x4807) {
+        if (off === 0x4800) return this.r4800;
+        if (off === 0x4801) return this.r4801;
+        if (off >= 0x4804) return this.mmc[off - 0x4804];
+        return -1;
+      }
+      return -1;
+    }
+    if (bank >= 0xC0 || (bank >= 0x40 && bank < 0x70)) return this.romByte(a);
+    return -1;
+  }
+  write(a, v) {
+    const bank = (a >>> 16) & 0x7F, off = a & 0xFFFF;
+    if (bank < 0x40 && off >= 0x4800 && off <= 0x4807) {
+      if (off === 0x4800) this.r4800 = v;
+      else if (off === 0x4801) this.r4801 = v;
+      else if (off >= 0x4804) this.mmc[off - 0x4804] = v & 0x8F;
+      return true;
+    }
+    return false;
+  }
+  // DMA hooks used by the SNES core
+  dmaBegin(c, addr, count) { this.size[c] = count; if (this.cur === c) this.cur = -1; }
+  dmaOn(c) { return (this.r4800 & this.r4801 & (1 << c)) !== 0; }
+  dmaByte(c, addr) {
+    if (this.cur !== c) { this.dec.init(addr); this.cur = c; this.left = this.size[c]; }
+    const v = this.dec.read();
+    if (--this.left <= 0) { this.r4801 &= ~(1 << c); this.cur = -1; }
+    return v;
+  }
+  saveState() { return { r4800: this.r4800, r4801: this.r4801, mmc: this.mmc.slice(), size: this.size.slice(), cur: this.cur, left: this.left, dec: this.cur >= 0 ? this.dec.saveState() : null }; }
+  loadState(s) {
+    this.r4800 = s.r4800; this.r4801 = s.r4801; this.mmc = s.mmc.slice(); this.size = s.size.slice(); this.cur = s.cur; this.left = s.left;
+    if (s.dec) this.dec.loadState(s.dec);
   }
 }
 
